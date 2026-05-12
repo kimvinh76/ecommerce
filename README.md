@@ -1,44 +1,156 @@
-# 📚 Bookstore Management System
+# Superbook - Nền tảng Bán sách Trực tuyến
 
-> Hệ thống quản lý cửa hàng sách trực tuyến - Dự án môn Phân tích và Thiết kế Hướng đối tượng
+Hệ thống thương mại điện tử chuyên bán sách được xây dựng bằng Node.js và React.js, cung cấp các chức năng quản lý sản phẩm, đơn hàng, người dùng và thanh toán trực tuyến.
 
-## 🎯 Giới thiệu
+## Công nghệ sử dụng
 
-Dự án xây dựng hệ thống quản lý cửa hàng sách trực tuyến với đầy đủ các chức năng: quản lý sản phẩm, đơn hàng, khách hàng, và phân quyền người dùng.
+**Backend:**
+- Node.js + Express.js
+- MongoDB + Mongoose (CSDL)
+- JWT (Xác thực)
+- Cloudinary (Lưu trữ hình ảnh)
+- PayOS (Thanh toán)
 
-**Công nghệ sử dụng:**
-- **Backend**: Node.js + Express.js
-- **Database**: MongoDB + Mongoose
-- **Frontend**: React.js (upcoming)
+**Frontend:**
+- React.js + Next.js
+- TypeScript
+- Tailwind CSS
 
-## 👥 Thành viên nhóm (Cho có thôi)
+## Chức năng chính
 
-| Thành viên | Vai trò | Trách nhiệm |
-|------------|---------|-------------|
-| **Thanh Hiền** | Team Lead / Backend Lead | Quản lý dự án, Backend chính |
-| **Quý** | Backend Developer | Hỗ trợ Backend |
-| **Dũng** | Backend Developer | Hỗ trợ Backend |
-| **Long** | Frontend Lead | Phát triển Frontend |
-| **Phong** | Frontend Developer | Hỗ trợ Frontend |
+**Quản lý Sản phẩm**
+- Thêm, chỉnh sửa, xóa sách
+- Phân loại sách (danh mục)
+- Quản lý tác giả, nhà xuất bản
+- Quản lý nhà cung cấp và chi tiết nhập hàng
 
-## 📁 Cấu trúc dự án
+**Quản lý Đơn hàng**
+- Tạo đơn hàng
+- Theo dõi trạng thái đơn hàng
+- Quản lý chi tiết đơn hàng
+
+**Quản lý Người dùng**
+- Đăng ký, đăng nhập
+- Quản lý thông tin cá nhân
+- Quản lý địa chỉ giao hàng
+- Phân quyền (Admin, User)
+
+**Giỏ hàng và Thanh toán**
+- Thêm, xóa sản phẩm trong giỏ hàng
+- Thanh toán qua Momo (Sandbox)
+- Xử lý thanh toán tự động
+
+**Các chức năng khác**
+- Hệ thống mã giảm giá (Coupon)
+- Đánh giá và nhận xét sản phẩm
+- Quản lý sự kiện khuyến mại
+- Tính năng tìm kiếm sản phẩm
+- Thống kê doanh số
+
+## Cài đặt
+
+### Yêu cầu
+- Node.js >= 18.x
+- MongoDB >= 6.x
+- npm hoặc yarn
+
+### Backend
+
+1. Di chuyển vào thư mục backend:
+```bash
+cd backend
+```
+
+2. Cài đặt dependencies:
+```bash
+npm install
+```
+
+3. Cấu hình biến môi trường (copy từ example.env):
+```bash
+cp example.env .env
+```
+
+4. Chạy server:
+```bash
+# Chế độ phát triển
+npm run dev
+
+# Chế độ production
+npm start
+```
+
+Server chạy tại: `http://localhost:3000`
+
+### Frontend
+
+1. Di chuyển vào thư mục frontend:
+```bash
+cd frontend
+```
+
+2. Cài đặt dependencies:
+```bash
+npm install
+```
+
+3. Chạy ứng dụng:
+```bash
+npm run dev
+```
+
+Frontend chạy tại: `http://localhost:3001`
+
+## Cấu hình Thanh toán Momo
+
+Thanh toán được tích hợp với Momo Sandbox để test:
+
+1. Cấu hình trong file `.env` (backend):
+```
+PAYOS_MERCHANT_ID=your_merchant_id
+PAYOS_API_KEY=your_api_key
+PAYOS_CHECKSUM_KEY=your_checksum_key
+```
+
+2. Momo Sandbox URL: `https://sandbox.momoapi.ngan.vn`
+
+3. Tài khoản test Momo:
+   - Phone: 0987654321
+   - Password: 123456
+
+## Cấu trúc dự án
 
 ```
-bookstore-express-app/
-├── backend/                # Backend API (Express.js)
+Super_Book/
+├── backend/                    # API backend
 │   ├── src/
-│   │   ├── config/        # Cấu hình database
-│   │   ├── controllers/   # Business logic
-│   │   ├── models/        # MongoDB models
-│   │   ├── routes/        # API routes
-│   │   ├── middlewares/   # Middleware functions
-│   │   └── server.js       # Entry point
-│   ├── .env               # Environment variables (không commit)
+│   │   ├── config/            # Cấu hình (DB, Cloudinary, PayOS, Email)
+│   │   ├── controllers/       # Xử lý logic của các API
+│   │   ├── models/            # Mô hình CSDL MongoDB
+│   │   ├── routes/            # Định tuyến API
+│   │   ├── services/          # Tầng dịch vụ
+│   │   ├── middlewares/       # Middleware (xác thực, phân quyền, xử lý lỗi)
+│   │   ├── dto/               # Data Transfer Objects
+│   │   ├── mappers/           # Chuyển đổi dữ liệu
+│   │   ├── helper/            # Hàm tiện ích
+│   │   ├── utils/             # Công cụ hỗ trợ
+│   │   └── server.js          # Entry point
 │   └── package.json
 │
-├── frontend/              # Frontend (React - upcoming)
+├── frontend/                   # Ứng dụng React
+│   ├── src/
+│   │   ├── app/              # Các trang chính
+│   │   ├── components/       # Các component tái sử dụng
+│   │   ├── api/              # Gọi API
+│   │   ├── hooks/            # React hooks tùy chỉnh
+│   │   ├── stores/           # State management
+│   │   ├── types/            # Định nghĩa kiểu dữ liệu
+│   │   ├── utils/            # Hàm tiện ích
+│   │   ├── constants/        # Hằng số
+│   │   └── validation/       # Xác thực dữ liệu
+│   └── package.json
 │
-├── documents/             # Tài liệu dự án
+├── documents/                 # Tài liệu dự án
 │   ├── bookstore-function.md
 │   ├── bookstore-project-plan.md
 │   └── classDiagram.puml
@@ -46,60 +158,32 @@ bookstore-express-app/
 └── README.md
 ```
 
-## 🚀 Cài đặt và Chạy dự án
+## API Documentation
 
-### Yêu cầu hệ thống
-- Node.js >= 18.x
-- MongoDB >= 6.x
-- npm hoặc yarn
+Danh sách các API endpoint chính được định nghĩa tại: [API_TEST_DOCUMENTATION.md](API_TEST_DOCUMENTATION.md)
 
-### Backend Setup
+Import Postman Collection: [BookStore_API.postman_collection.json](BookStore_API.postman_collection.json)
 
-1. **Clone repository:**
-```bash
-git clone git@github.com:Hiennguyen278610/bookstore-expess-app.git
-cd bookstore-express-app
-```
+## Các API chính
 
-2. **Cài đặt dependencies:**
-```bash
-cd backend
-npm install
-```
+- `/api/auth` - Xác thực (đăng ký, đăng nhập)
+- `/api/users` - Quản lý người dùng
+- `/api/books` - Quản lý sách
+- `/api/categories` - Quản lý danh mục
+- `/api/authors` - Quản lý tác giả
+- `/api/publishers` - Quản lý nhà xuất bản
+- `/api/suppliers` - Quản lý nhà cung cấp
+- `/api/cart` - Quản lý giỏ hàng
+- `/api/orders` - Quản lý đơn hàng
+- `/api/payment` - Xử lý thanh toán
+- `/api/coupons` - Quản lý mã giảm giá
+- `/api/reviews` - Quản lý đánh giá
+- `/api/addresses` - Quản lý địa chỉ
+- `/api/events` - Quản lý sự kiện
+- `/api/statistics` - Thống kê doanh số
 
-3. **Cấu hình môi trường:**
-```bash
-# Tạo file .env từ example.env
-cp example.env .env
-```
 
-4. **Chạy server:**
-```bash
-# Development mode
-npm run dev
-
-# Production mode
-npm start
-```
-
-Server sẽ chạy tại: `http://localhost:3000`
-
-### Frontend Setup
-*(Coming soon)*
-
-## 📝 API Documentation
-
-### Users Endpoints
-
-| Method | Endpoint | Mô tả |
-|--------|----------|-------|
-| GET | `/api/users` | Lấy danh sách người dùng |
-| POST | `/api/users` | Tạo người dùng mới |
-| GET | `/api/users/:id` | Lấy thông tin người dùng |
-| PUT | `/api/users/:id` | Cập nhật người dùng |
-| DELETE | `/api/users/:id` | Xóa người dùng |
-
-## 🔧 Công nghệ & Thư viện
+##  Công nghệ & Thư viện
 
 ### Backend
 - **express**: ^5.1.0 - Web framework
@@ -108,9 +192,25 @@ Server sẽ chạy tại: `http://localhost:3000`
 - **nodemon**: ^3.1.0 - Auto-reload trong development
 
 ### Frontend
-*(Coming soon)*
+- **next**: ^15.5.7 - Framework React cho giao diện web
+- **react**: 19.1.0 - UI library
+- **typescript**: ^5 - Kiểu dữ liệu tĩnh
+- **tailwindcss**: ^4 - Thiết kế giao diện
+- **zustand**: ^5.0.9 - Quản lý trạng thái
+- **swr**: ^2.3.6 - Fetch và cache dữ liệu
+- **react-hook-form**: ^7.64.0 - Quản lý form
+- **zod**: ^4.1.11 - Validate dữ liệu
+- **axios**: ^1.12.2 - Gọi API
+- **sonner** / **react-hot-toast** / **react-toastify** - Thông báo giao diện
 
-## 📊 Database Schema
+### Frontend chức năng hiện có
+- Trang giao diện bán sách cơ bản
+- Hiển thị danh sách và chi tiết sản phẩm
+- Giỏ hàng và luồng đặt hàng
+- Đăng nhập, đăng ký và quản lý thông tin người dùng
+- Màn hình thanh toán và thông báo kết quả giao dịch
+
+
 
 ### Collections chính:
 - **Users**: Quản lý người dùng
@@ -119,26 +219,5 @@ Server sẽ chạy tại: `http://localhost:3000`
 - **Orders**: Đơn hàng
 - **Reviews**: Đánh giá sách
 
-Chi tiết xem tại: [documents/classDiagram.puml](documents/classDiagram.puml)
 
-## 🎯 Tính năng chính
 
-Chi tiết xem tại: [documents/classDiagram.puml](documents/bookstore-function.md)
-## 📅 Lộ trình phát triển
-
-- [x] **Tuần 1**: Setup dự án & thiết kế database
-- [ ] **Tuần 2**: Xây dựng Backend API cơ bản
-- [ ] **Tuần 3**: Authentication & Authorization
-- [ ] **Tuần 4**: Frontend cơ bản
-- [ ] **Tuần 5**: Tích hợp & Testing
-- [ ] **Tuần 6**: Hoàn thiện & Deploy
-
-Chi tiết xem tại: [documents/bookstore-project-plan.md](documents/bookstore-project-plan.md)
-
-## 🤝 Đóng góp
-
-1. Fork dự án
-2. Tạo branch mới (`git checkout -b <tên nhánh của ae>`)
-3. Commit changes (`git commit -m '36 36 36'`)
-4. Push to branch (`git push origin <nhánh cần push>`)
-5. Tạo Pull Request
