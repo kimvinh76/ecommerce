@@ -31,10 +31,6 @@ const ProductDetailPage = async ({
   }
   const detailRows = [
     {
-      label: "Tên Nhà Cung Cấp",
-      value: book.supplierId?.name || "Chưa cập nhật",
-    },
-    {
       label: "Tác giả",
       value:
         book.authors && book.authors.length > 0
