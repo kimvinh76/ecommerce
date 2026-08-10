@@ -12,18 +12,18 @@ export async function createBookService(book, files) {
       name,
       categoryId,
       publisherId,
-      supplierId,
       publishYear,
       dimensions,
       pageCount,
       format,
       description,
-      quantity,
       price,
       authors,
     } = book;
     authors = JSON.parse(authors);
-    if (!name || !categoryId || !publisherId || !supplierId || !authors) {
+
+    if (!name || !categoryId || !publisherId || !authors) {
+
       // chan do phai fetch len neu du lieu loi
       throw new Error("Can't upload image to cloudinary!");
     }
@@ -32,14 +32,12 @@ export async function createBookService(book, files) {
       name: name,
       categoryId: categoryId,
       publisherId: publisherId,
-      supplierId: supplierId,
       publishYear: publishYear || new Date().getFullYear(),
       dimensions: dimensions,
       pageCount: pageCount || 0,
       format: format,
       description: description,
       imageUrl: imageUrl,
-      quantity: quantity,
       price: price,
     });
     if (authors && authors.length > 0) {
@@ -55,7 +53,6 @@ export async function createBookService(book, files) {
     const populatedBook = await Book.findById(newBook._id)
       .populate("categoryId", "name")
       .populate("publisherId", "name")
-      .populate("supplierId", "name")
       .lean();
     const authorsRel = await BookAuthor.find({
       bookId: newBook._id,
@@ -73,13 +70,11 @@ export async function updateBookService(id, data, files) {
     name,
     categoryId,
     publisherId,
-    supplierId,
     publishYear,
     dimensions,
     pageCount,
     format,
     description,
-    quantity,
     price,
     authors,
     existingImages,
@@ -101,13 +96,11 @@ export async function updateBookService(id, data, files) {
   book.name = name;
   book.categoryId = categoryId;
   book.publisherId = publisherId;
-  book.supplierId = supplierId;
   book.publishYear = publishYear || book.publishYear || new Date().getFullYear();
   book.dimensions = dimensions;
   book.pageCount = pageCount || 0;
   book.format = format;
   book.description = description;
-  book.quantity = quantity;
   book.price = price;
 
   if (authors && Array.isArray(authors)) {
@@ -153,17 +146,16 @@ export async function findBookService(_id, includeDeleted = false) {
   const book = await Book.findById(_id)
     .populate("categoryId", "name")
     .populate("publisherId", "name")
-    .populate("supplierId", "name")
     .lean();
   if (!book) {
     throw new Error(`Book with id ${_id} not found`);
   }
-  
+
   // Check if book is deleted - nếu không cho phép deleted
   if (!includeDeleted && book.isDeleted) {
     throw new Error(`Book with id ${_id} not found`);
   }
-  
+
   const authors = await BookAuthor.find({ bookId: book._id }).populate(
     "authorId",
     "name"
@@ -313,7 +305,6 @@ export async function getAllBooksService(query) {
       Book.find(filter)
         .populate("categoryId", "name")
         .populate("publisherId", "name")
-        .populate("supplierId", "name")
         .skip(skip)
         .limit(limit)
         .sort(sortOptions)

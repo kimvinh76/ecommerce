@@ -8,10 +8,6 @@ export interface BookDetail {
   categoryId: Category;
   publisherId: Publisher;
   authors?: string[];
-  supplierId?: {
-    _id: string;
-    name: string;
-  };
   productCode?: string;
   translator?: string;
   publishYear?: number;
@@ -42,10 +38,6 @@ export interface Book {
     name: string;
   };
   publisherId: {
-    _id: string;
-    name: string;
-  };
-  supplierId?: {
     _id: string;
     name: string;
   };
