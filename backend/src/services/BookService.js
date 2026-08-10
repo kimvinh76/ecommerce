@@ -305,7 +305,6 @@ export async function getAllBooksService(query) {
       Book.find(filter)
         .populate("categoryId", "name")
         .populate("publisherId", "name")
-        .populate("supplierId", "name")
         .skip(skip)
         .limit(limit)
         .sort(sortOptions)
