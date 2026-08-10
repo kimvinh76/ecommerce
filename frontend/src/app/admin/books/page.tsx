@@ -63,7 +63,6 @@ export default function BooksPage() {
     categoryId: "",
     authorIds: [] as string[],
     publisherId: "",
-    supplierId: "",
     publishYear: new Date().getFullYear(),
     dimensions: "",
     pageCount: 0,
@@ -185,13 +184,21 @@ export default function BooksPage() {
       !formData.name ||
       !formData.categoryId ||
       !formData.publisherId ||
-      !formData.supplierId ||
       formData.authorIds.length === 0
     ) {
       Swal.fire({
         icon: 'error',
         title: 'Lỗi',
-        text: 'Vui lòng điền đầy đủ thông tin!',
+        text: 'Vui lòng điền đầy đủ các thông tin bắt buộc (*)!',
+      });
+      return;
+    }
+
+    if (formData.price <= 0) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Lỗi',
+        text: 'Giá sách phải lớn hơn 0!',
       });
       return;
     }
@@ -203,7 +210,6 @@ export default function BooksPage() {
       submitData.append('name', formData.name);
       submitData.append('categoryId', formData.categoryId);
       submitData.append('publisherId', formData.publisherId);
-      submitData.append('supplierId', formData.supplierId);
       submitData.append('publishYear', formData.publishYear.toString());
       submitData.append('dimensions', formData.dimensions);
       submitData.append('pageCount', formData.pageCount.toString());
@@ -317,7 +323,6 @@ export default function BooksPage() {
         categoryId: book.categoryId?._id || '',
         authorIds: authorIds,
         publisherId: book.publisherId?._id || '',
-        supplierId: book.supplierId?._id || '',
         publishYear: book.publishYear || new Date().getFullYear(),
         dimensions: book.dimensions || '',
         pageCount: book.pageCount || 0,
@@ -336,7 +341,6 @@ export default function BooksPage() {
         categoryId: categories[0]?._id || "",
         authorIds: [],
         publisherId: publishers[0]?._id || "",
-        supplierId: suppliers[0]?._id || "",
         publishYear: new Date().getFullYear(),
         dimensions: "",
         pageCount: 0,
@@ -409,7 +413,6 @@ export default function BooksPage() {
       categoryId: "",
       authorIds: [],
       publisherId: "",
-      supplierId: "",
       publishYear: new Date().getFullYear(),
       dimensions: "",
       pageCount: 0,
@@ -684,18 +687,6 @@ export default function BooksPage() {
                       onChange={(value) => setFormData({ ...formData, publisherId: value })}
                       options={publishers}
                       placeholder="Chọn NXB"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-gray-700 mb-1.5 font-medium text-sm">Nhà cung cấp *</label>
-                    <SearchableSelect
-                      value={formData.supplierId}
-                      onChange={(value) => setFormData({ ...formData, supplierId: value })}
-                      options={suppliers}
-                      placeholder="Chọn NCC"
                     />
                   </div>
                 </div>

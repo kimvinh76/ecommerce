@@ -6,6 +6,25 @@ import Category from "../models/Category.js";
 import SupplyReceipt from "../models/SupplyReceipt.js";
 import SupplyDetail from "../models/SupplyDetail.js";
 
+// Helper: parse date string (YYYY-MM-DD) sang Date object theo giờ Việt Nam (UTC+7)
+// Tránh lỗi timezone khi frontend gửi YYYY-MM-DD, bật lưu lú c query end-of-day cho cận trên
+function parseDateRange(from, to) {
+    const VN_OFFSET_MS = 7 * 60 * 60 * 1000; // UTC+7
+    let fromDate = null;
+    let toDate = null;
+    if (from) {
+        // Đầu ngày theo giờ VN: YYYY-MM-DD 00:00:00 +07:00
+        const [y, m, d] = from.split('-').map(Number);
+        fromDate = new Date(Date.UTC(y, m - 1, d, 0, 0, 0) - VN_OFFSET_MS);
+    }
+    if (to) {
+        // Cuối ngày theo giờ VN: YYYY-MM-DD 23:59:59.999 +07:00
+        const [y, m, d] = to.split('-').map(Number);
+        toDate = new Date(Date.UTC(y, m - 1, d, 23, 59, 59, 999) - VN_OFFSET_MS);
+    }
+    return { fromDate, toDate };
+}
+
 // Tổng quan: tổng sách, users, đơn hàng, doanh thu, lợi nhuận, low stock
 export async function getOverviewStatsService(from, to) {
     try {
@@ -24,9 +43,10 @@ export async function getOverviewStatsService(from, to) {
         // Build match condition for orders with optional date filter
         const orderMatchCondition = {};
         if (from || to) {
+            const { fromDate, toDate } = parseDateRange(from, to);
             orderMatchCondition.createdAt = {};
-            if (from) orderMatchCondition.createdAt.$gte = new Date(from);
-            if (to) orderMatchCondition.createdAt.$lte = new Date(to);
+            if (fromDate) orderMatchCondition.createdAt.$gte = fromDate;
+            if (toDate) orderMatchCondition.createdAt.$lte = toDate;
         }
 
         const [
@@ -73,9 +93,10 @@ export async function getOverviewStatsService(from, to) {
         // Build match condition for supply receipts with optional date filter
         const supplyMatchCondition = { purchaseStatus: "completed" };
         if (from || to) {
+            const { fromDate, toDate } = parseDateRange(from, to);
             supplyMatchCondition.createdAt = {};
-            if (from) supplyMatchCondition.createdAt.$gte = new Date(from);
-            if (to) supplyMatchCondition.createdAt.$lte = new Date(to);
+            if (fromDate) supplyMatchCondition.createdAt.$gte = fromDate;
+            if (toDate) supplyMatchCondition.createdAt.$lte = toDate;
         }
 
         // Tính tổng chi phí nhập hàng - CHỈ từ phiếu đã hoàn tất
@@ -163,9 +184,10 @@ export async function getRevenueStatsService(period = "month", from, to) {
         // Build match condition
         const matchCondition = { purchaseStatus: "completed" };
         if (from || to) {
+            const { fromDate, toDate } = parseDateRange(from, to);
             matchCondition.createdAt = {};
-            if (from) matchCondition.createdAt.$gte = new Date(from);
-            if (to) matchCondition.createdAt.$lte = new Date(to);
+            if (fromDate) matchCondition.createdAt.$gte = fromDate;
+            if (toDate) matchCondition.createdAt.$lte = toDate;
         }
 
         const revenue = await Order.aggregate([
@@ -237,9 +259,10 @@ export async function getProfitStatsService(period = "month", from, to) {
 
         const matchCondition = { purchaseStatus: "completed" }; // Chỉ lấy phiếu hoàn tất
         if (from || to) {
+            const { fromDate, toDate } = parseDateRange(from, to);
             matchCondition.createdAt = {};
-            if (from) matchCondition.createdAt.$gte = new Date(from);
-            if (to) matchCondition.createdAt.$lte = new Date(to);
+            if (fromDate) matchCondition.createdAt.$gte = fromDate;
+            if (toDate) matchCondition.createdAt.$lte = toDate;
         }
 
         const costs = await SupplyReceipt.aggregate([
@@ -303,9 +326,10 @@ export async function getTopProductsService(limit = 10, from, to) {
         // Build match for orders in optional date range
         const orderMatch = { "order.purchaseStatus": "completed" };
         if (from || to) {
+            const { fromDate, toDate } = parseDateRange(from, to);
             const createdAtMatch = {};
-            if (from) createdAtMatch.$gte = new Date(from);
-            if (to) createdAtMatch.$lte = new Date(to);
+            if (fromDate) createdAtMatch.$gte = fromDate;
+            if (toDate) createdAtMatch.$lte = toDate;
             orderMatch["order.createdAt"] = createdAtMatch;
         }
 
@@ -398,9 +422,10 @@ export async function getTopCategoriesService(limit = 5, from, to) {
         // Build match for orders in optional date range
         const orderMatch = { "order.purchaseStatus": "completed" };
         if (from || to) {
+            const { fromDate, toDate } = parseDateRange(from, to);
             const createdAtMatch = {};
-            if (from) createdAtMatch.$gte = new Date(from);
-            if (to) createdAtMatch.$lte = new Date(to);
+            if (fromDate) createdAtMatch.$gte = fromDate;
+            if (toDate) createdAtMatch.$lte = toDate;
             orderMatch["order.createdAt"] = createdAtMatch;
         }
 
@@ -477,9 +502,10 @@ export async function getPaymentMethodsStatsService(from, to) {
         // Build match condition for optional date range
         const match = {};
         if (from || to) {
+            const { fromDate, toDate } = parseDateRange(from, to);
             match.createdAt = {};
-            if (from) match.createdAt.$gte = new Date(from);
-            if (to) match.createdAt.$lte = new Date(to);
+            if (fromDate) match.createdAt.$gte = fromDate;
+            if (toDate) match.createdAt.$lte = toDate;
         }
 
         const pipeline = [];
@@ -595,9 +621,10 @@ export async function getOrderStatusStatsService(from, to) {
     try {
         const matchCondition = {};
         if (from || to) {
+            const { fromDate, toDate } = parseDateRange(from, to);
             matchCondition.createdAt = {};
-            if (from) matchCondition.createdAt.$gte = new Date(from);
-            if (to) matchCondition.createdAt.$lte = new Date(to);
+            if (fromDate) matchCondition.createdAt.$gte = fromDate;
+            if (toDate) matchCondition.createdAt.$lte = toDate;
         }
 
         const statusStats = await Order.aggregate([

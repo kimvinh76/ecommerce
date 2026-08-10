@@ -23,7 +23,9 @@ export async function createBookService(book, files) {
       authors,
     } = book;
     authors = JSON.parse(authors);
-    if (!name || !categoryId || !publisherId || !supplierId || !authors) {
+
+    if (!name || !categoryId || !publisherId || !authors) {
+
       // chan do phai fetch len neu du lieu loi
       throw new Error("Can't upload image to cloudinary!");
     }
@@ -32,7 +34,7 @@ export async function createBookService(book, files) {
       name: name,
       categoryId: categoryId,
       publisherId: publisherId,
-      supplierId: supplierId,
+      supplierId: supplierId || undefined,
       publishYear: publishYear || new Date().getFullYear(),
       dimensions: dimensions,
       pageCount: pageCount || 0,
@@ -101,7 +103,7 @@ export async function updateBookService(id, data, files) {
   book.name = name;
   book.categoryId = categoryId;
   book.publisherId = publisherId;
-  book.supplierId = supplierId;
+  book.supplierId = supplierId || undefined;
   book.publishYear = publishYear || book.publishYear || new Date().getFullYear();
   book.dimensions = dimensions;
   book.pageCount = pageCount || 0;
@@ -158,12 +160,12 @@ export async function findBookService(_id, includeDeleted = false) {
   if (!book) {
     throw new Error(`Book with id ${_id} not found`);
   }
-  
+
   // Check if book is deleted - nếu không cho phép deleted
   if (!includeDeleted && book.isDeleted) {
     throw new Error(`Book with id ${_id} not found`);
   }
-  
+
   const authors = await BookAuthor.find({ bookId: book._id }).populate(
     "authorId",
     "name"
