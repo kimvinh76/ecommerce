@@ -8,7 +8,6 @@ import type { Book, BooksResponse } from "@/types/book.type";
 import type { Author } from "@/types/author.type";
 import type { Category } from "@/types/category.type";
 import type { Publisher } from "@/types/publisher.type";
-import type { Supplier } from "@/types/supplier.type";
 import axios from "axios";
 import { baseUrl } from "@/constants/index";
 import { createBook, updateBook, deleteBook } from "@/api/bookApi";
@@ -34,7 +33,6 @@ export default function BooksPage() {
   const [authors, setAuthors] = useState<Author[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [publishers, setPublishers] = useState<Publisher[]>([]);
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [pagination, setPagination] = useState({
     totalItems: 0,
@@ -69,7 +67,6 @@ export default function BooksPage() {
     format: "Bìa mềm",
     description: "",
     imageUrl: [] as string[],
-    quantity: 0,
     price: 0
   });
 
@@ -79,7 +76,6 @@ export default function BooksPage() {
     fetchAuthors();
     fetchCategories();
     fetchPublishers();
-    fetchSuppliers();
   }, [pagination.currentPage, pagination.limit]);
 
   const fetchBooks = async () => {
@@ -124,15 +120,6 @@ export default function BooksPage() {
       setPublishers(response.data);
     } catch (error) {
       console.error("Error fetching publishers:", error);
-    }
-  };
-
-  const fetchSuppliers = async () => {
-    try {
-      const response = await api.get(`${baseUrl}/suppliers`);
-      setSuppliers(response.data);
-    } catch (error) {
-      console.error("Error fetching suppliers:", error);
     }
   };
 
@@ -218,7 +205,6 @@ export default function BooksPage() {
       // Backend expects authors as JSON string with authorId property
       const authorsData = formData.authorIds.map(id => ({ authorId: id }));
       submitData.append('authors', JSON.stringify(authorsData));
-      submitData.append('quantity', formData.quantity.toString());
       submitData.append('price', formData.price.toString());
 
       // Only add images if user selected new files
@@ -312,12 +298,9 @@ export default function BooksPage() {
   const openModal = (book: Book | null = null) => {
     if (book) {
       setEditingBook(book);
-      console.log('Opening edit modal with book:', book);
-      console.log('Book authors:', book.authors);
       const authorIds = Array.isArray(book.authors) && book.authors
         ? book.authors.map((a: Author) => a._id).filter(Boolean)
         : [];
-      console.log('Extracted authorIds:', authorIds);
       setFormData({
         name: book.name,
         categoryId: book.categoryId?._id || '',
@@ -329,7 +312,6 @@ export default function BooksPage() {
         format: book.format || 'Bìa mềm',
         description: book.description || '',
         imageUrl: book.imageUrl,
-        quantity: book.quantity,
         price: book.price
       });
       setImagePreviews(book.imageUrl);
@@ -347,7 +329,6 @@ export default function BooksPage() {
         format: "Bìa mềm",
         description: "",
         imageUrl: [],
-        quantity: 0,
         price: 0
       });
       setImagePreviews([]);
@@ -419,7 +400,6 @@ export default function BooksPage() {
       format: "Bìa mềm",
       description: "",
       imageUrl: [],
-      quantity: 0,
       price: 0
     });
     setImagePreviews([]);
@@ -691,19 +671,6 @@ export default function BooksPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  {/* Quantity */}
-                  <div>
-                    <label className="block text-gray-700 mb-1.5 font-medium text-sm">Số lượng *</label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={0}
-                      readOnly
-                      disabled
-                      className="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-100 cursor-not-allowed text-sm text-gray-500"
-                    />
-                  </div>
                   {/* Price */}
                   <div>
                     <label className="block text-gray-700 mb-1.5 font-medium text-sm">Giá (VNĐ) *</label>
@@ -715,7 +682,6 @@ export default function BooksPage() {
                       className="w-full border border-gray-300 px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm"
                     />
                   </div>
-                </div>
 
                 <div className="grid grid-cols-1 gap-3">
                   <div>
@@ -923,7 +889,6 @@ export default function BooksPage() {
                   <p><span className="text-gray-500">Thể loại:</span> <span className="font-medium text-gray-800">{detailBook.categoryId && typeof detailBook.categoryId === 'object' ? detailBook.categoryId.name : detailBook.categoryId ? getCategoryName(detailBook.categoryId as string) : 'N/A'}</span></p>
                   <p><span className="text-gray-500">Tác giả:</span> <span className="font-medium text-gray-800">{Array.isArray(detailBook.authors) && detailBook.authors.length > 0 ? detailBook.authors.map(a => a?.name).filter(Boolean).join(', ') || 'N/A' : 'N/A'}</span></p>
                   <p><span className="text-gray-500">NXB:</span> <span className="font-medium text-gray-800">{detailBook.publisherId && typeof detailBook.publisherId === 'object' ? detailBook.publisherId.name : detailBook.publisherId ? getPublisherName(detailBook.publisherId as string) : 'N/A'}</span></p>
-                  <p><span className="text-gray-500">Nhà cung cấp:</span> <span className="font-medium text-gray-800">{detailBook.supplierId?.name || 'N/A'}</span></p>
                   <p><span className="text-gray-500">Năm XB:</span> <span className="font-medium text-gray-800">{detailBook.publishYear || 'N/A'}</span></p>
                   <p><span className="text-gray-500">Kích thước:</span> <span className="font-medium text-gray-800">{detailBook.dimensions || 'N/A'}</span></p>
                   <p><span className="text-gray-500">Số trang:</span> <span className="font-medium text-gray-800">{detailBook.pageCount || 'N/A'}</span></p>

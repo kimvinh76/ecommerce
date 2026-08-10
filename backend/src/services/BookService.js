@@ -12,13 +12,11 @@ export async function createBookService(book, files) {
       name,
       categoryId,
       publisherId,
-      supplierId,
       publishYear,
       dimensions,
       pageCount,
       format,
       description,
-      quantity,
       price,
       authors,
     } = book;
@@ -34,14 +32,12 @@ export async function createBookService(book, files) {
       name: name,
       categoryId: categoryId,
       publisherId: publisherId,
-      supplierId: supplierId || undefined,
       publishYear: publishYear || new Date().getFullYear(),
       dimensions: dimensions,
       pageCount: pageCount || 0,
       format: format,
       description: description,
       imageUrl: imageUrl,
-      quantity: quantity,
       price: price,
     });
     if (authors && authors.length > 0) {
@@ -57,7 +53,6 @@ export async function createBookService(book, files) {
     const populatedBook = await Book.findById(newBook._id)
       .populate("categoryId", "name")
       .populate("publisherId", "name")
-      .populate("supplierId", "name")
       .lean();
     const authorsRel = await BookAuthor.find({
       bookId: newBook._id,
@@ -75,13 +70,11 @@ export async function updateBookService(id, data, files) {
     name,
     categoryId,
     publisherId,
-    supplierId,
     publishYear,
     dimensions,
     pageCount,
     format,
     description,
-    quantity,
     price,
     authors,
     existingImages,
@@ -103,13 +96,11 @@ export async function updateBookService(id, data, files) {
   book.name = name;
   book.categoryId = categoryId;
   book.publisherId = publisherId;
-  book.supplierId = supplierId || undefined;
   book.publishYear = publishYear || book.publishYear || new Date().getFullYear();
   book.dimensions = dimensions;
   book.pageCount = pageCount || 0;
   book.format = format;
   book.description = description;
-  book.quantity = quantity;
   book.price = price;
 
   if (authors && Array.isArray(authors)) {
@@ -155,7 +146,6 @@ export async function findBookService(_id, includeDeleted = false) {
   const book = await Book.findById(_id)
     .populate("categoryId", "name")
     .populate("publisherId", "name")
-    .populate("supplierId", "name")
     .lean();
   if (!book) {
     throw new Error(`Book with id ${_id} not found`);

@@ -5,7 +5,6 @@ const bookSchema = new mongoose.Schema({
   name: { type: String, required: true },
   categoryId: { type: mongoose.Schema.Types.ObjectId, ref: 'Category', required: true },
   publisherId: {type: mongoose.Schema.Types.ObjectId, ref: 'Publisher', required: true },
-  supplierId: { type: mongoose.Schema.Types.ObjectId, ref: 'Supplier' },
   productCode: { type: String, trim: true, unique: true, sparse: true },
   translator: { type: String, trim: true, default: '' },
   publishYear: { type: Number },
