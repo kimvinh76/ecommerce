@@ -42,17 +42,7 @@ export async function deleteCategory(req, res) {
     res.status(400).json({ message: err.message });
   }
 }
-export async function getCategoryById(req, res) {
-  try {
-    const category = await getCategoryByIdService(req.params.id);
-    if (!category) {
-      return res.status(404).json({ message: "Category not found" });
-    }
-    res.status(200).json(category);
-  } catch (err) {
-    res.status(400).json({ message: err.message });
-  }
-}
+
 
 export async function getCategoryByValue(req, res) {
   try {
@@ -85,15 +75,3 @@ export async function getAllCategories(req, res) {
   }
 }
 
-export async function getCategoryBySlug(req, res) {
-  try {
-    const { slug } = req.params;
-    const category = await getCategoryBySlugService(slug);
-    if (!category) {
-      return res.status(404).json({ message: "None category exists" });
-    }
-    res.status(200).json(category);
-  } catch (error) {
-    res.status(400).json({ message: error.message });
-  }
-}
