@@ -75,7 +75,7 @@ export async function validateCouponService(code, subtotal) {
   };
 }
 
-export async function applyCouponUsageService(couponId) {
+export async function applyCouponUsageService(couponId, session) {
   if (!couponId) return;
-  await Coupon.findByIdAndUpdate(couponId, { $inc: { usedCount: 1 } });
+  await Coupon.findByIdAndUpdate(couponId, { $inc: { usedCount: 1 } }, { session });
 }

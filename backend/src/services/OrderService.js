@@ -78,82 +78,111 @@ export async function createOrderService(
   receiverAddress,
   couponCode,
 ) {
-  let subtotalAmount = 0;
-  let discountAmount = 0;
-  let appliedCouponCode = null;
-  let appliedCouponId = null;
-  const activeEvents = await getActiveEvents();
+  const session = await mongoose.startSession();
+  session.startTransaction();
 
-  const order = await Order.create({
-    customerId: customerId,
-    paymentMethod: paymentMethod,
-    receiverName: receiverName,
-    receiverPhone: receiverPhone,
-    receiverAddress: receiverAddress,
-  });
+  try {
+    let subtotalAmount = 0;
+    let discountAmount = 0;
+    let appliedCouponCode = null;
+    let appliedCouponId = null;
+    const activeEvents = await getActiveEvents();
 
-  if (details && details.length > 0) {
-    const subtotals = await Promise.all(
-      details.map(async (item) => {
-        const book = await Book.findById(item.bookId);
-        if (!book) {
-          throw new Error(`Book with id ${item.bookId} not found`);
-        }
-        if (item.quantity <= 0) {
-          throw new Error("Quantity > 0");
-        }
-        if (book.quantity < item.quantity) {
-          throw new Error("Out of stock");
-        }
-        const effectivePrice = getEffectiveBookPrice(book, activeEvents).price;
-
-        return await OrderDetail.create({
-          orderId: order._id,
-          bookId: book._id,
-          quantity: item.quantity,
-          price: effectivePrice,
-        });
-      }),
+    const [order] = await Order.create(
+      [
+        {
+          customerId: customerId,
+          paymentMethod: paymentMethod,
+          receiverName: receiverName,
+          receiverPhone: receiverPhone,
+          receiverAddress: receiverAddress,
+        },
+      ],
+      { session },
     );
 
-    subtotalAmount = subtotals.reduce(
-      (sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 0),
-      0,
+    if (details && details.length > 0) {
+      const subtotals = await Promise.all(
+        details.map(async (item) => {
+          if (item.quantity <= 0) {
+            throw new Error("Quantity > 0");
+          }
+
+          const book = await Book.findOneAndUpdate(
+            { _id: item.bookId, quantity: { $gte: item.quantity } },
+            { $inc: { quantity: -item.quantity } },
+            { new: true, session },
+          );
+
+          if (!book) {
+            const existingBook = await Book.findById(item.bookId).session(session);
+            if (!existingBook) throw new Error(`Book with id ${item.bookId} not found`);
+            throw new Error(`Sách "${existingBook.name}" không đủ hàng`);
+          }
+
+          const effectivePrice = getEffectiveBookPrice(book, activeEvents).price;
+
+          const [orderDetail] = await OrderDetail.create(
+            [
+              {
+                orderId: order._id,
+                bookId: book._id,
+                quantity: item.quantity,
+                price: effectivePrice,
+              },
+            ],
+            { session },
+          );
+          return orderDetail;
+        }),
+      );
+
+      subtotalAmount = subtotals.reduce(
+        (sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 0),
+        0,
+      );
+    }
+
+    if (couponCode) {
+      const validatedCoupon = await validateCouponService(
+        couponCode,
+        subtotalAmount,
+      );
+      discountAmount = validatedCoupon.discountAmount;
+      appliedCouponCode = validatedCoupon.code;
+      appliedCouponId = validatedCoupon.coupon._id;
+    }
+
+    order.subtotalAmount = subtotalAmount;
+    order.discountAmount = discountAmount;
+    order.couponCode = appliedCouponCode;
+    order.totalAmount = Math.max(0, subtotalAmount - discountAmount);
+    await order.save({ session });
+
+    if (appliedCouponId) {
+      await applyCouponUsageService(appliedCouponId, session);
+    }
+
+    await saveReceiverAddressIfNeeded(
+      customerId,
+      receiverName,
+      receiverPhone,
+      receiverAddress,
     );
+
+    await session.commitTransaction();
+    session.endSession();
+
+    const populatedOrders = await Order.findById(order._id)
+      .populate("customerId", "fullName email")
+      .lean();
+    populatedOrders.details = await OrderDetail.find({ orderId: order._id });
+    return populatedOrders;
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    throw error;
   }
-
-  if (couponCode) {
-    const validatedCoupon = await validateCouponService(
-      couponCode,
-      subtotalAmount,
-    );
-    discountAmount = validatedCoupon.discountAmount;
-    appliedCouponCode = validatedCoupon.code;
-    appliedCouponId = validatedCoupon.coupon._id;
-  }
-
-  order.subtotalAmount = subtotalAmount;
-  order.discountAmount = discountAmount;
-  order.couponCode = appliedCouponCode;
-  order.totalAmount = Math.max(0, subtotalAmount - discountAmount);
-  await order.save();
-
-  if (appliedCouponId) {
-    await applyCouponUsageService(appliedCouponId);
-  }
-
-  await saveReceiverAddressIfNeeded(
-    customerId,
-    receiverName,
-    receiverPhone,
-    receiverAddress,
-  );
-
-  const populatedOrders = await Order.findById(order._id)
-    .populate("customerId", "fullName email")
-    .lean();
-  populatedOrders.details = await OrderDetail.find({ orderId: order._id });
-  return populatedOrders;
 }
 
 // DELETE - DELETE order
@@ -208,22 +237,14 @@ export async function updateOrderService(
       // Handle inventory
       const details = await OrderDetail.find({ orderId }).session(session);
 
-      if (oldStatus === "pending" && purchaseStatus === "processing") {
-        // Giảm inventory
+      if (oldStatus !== "canceled" && purchaseStatus === "canceled") {
+        // Tăng inventory (Hoàn kho)
         for (const item of details) {
-          const book = await Book.findById(item.bookId).session(session);
-          if (book.quantity < item.quantity) {
-            throw new Error(`Sách "${book.name}" không đủ hàng`);
-          }
-          book.quantity -= item.quantity;
-          await book.save({ session });
-        }
-      } else if (["processing", "delivery"].includes(oldStatus) && purchaseStatus === "canceled") {
-        // Tăng inventory
-        for (const item of details) {
-          const book = await Book.findById(item.bookId).session(session);
-          book.quantity += item.quantity;
-          await book.save({ session });
+          const book = await Book.findOneAndUpdate(
+            { _id: item.bookId },
+            { $inc: { quantity: item.quantity } },
+            { new: true, session }
+          );
         }
       }
 
