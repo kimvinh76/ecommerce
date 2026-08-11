@@ -11,6 +11,7 @@ import {
 } from "../utils/MailTemplate.js";
 import { sendMail } from "./mail.service.js";
 import User from "../models/User.js";
+import { updateOrderService } from "./OrderService.js";
 
 function normalizeOrderCode(order) {
   if (order.payosOrderId) return order.payosOrderId;
@@ -281,18 +282,17 @@ async function handleMomoResult({ orderId, resultCode }) {
   const isSuccess = String(resultCode) === "0";
   if (isSuccess) {
     if (order.paymentStatus !== "paid") {
-      order.paymentStatus = "paid";
-      if (order.purchaseStatus === "pending") {
-        order.purchaseStatus = "processing";
-      }
-      await order.save();
+      // 1. Nếu đơn đang là "Chờ xác nhận" (pending), chuẩn bị trạng thái mới là "Đang xử lý" (processing)
+
+      const newPurchaseStatus = order.purchaseStatus === "pending" ? "processing" : order.purchaseStatus;
+      await updateOrderService(order._id, order.customerId, newPurchaseStatus, "paid");
     }
     return { orderId: order._id, orderCode: orderId, status: "PAID" };
   }
 
   if (order.paymentStatus !== "failed") {
-    order.paymentStatus = "failed";
-    await order.save();
+    // 2. GỌI HÀM UPDATE CỦA HỆ THỐNG
+    await updateOrderService(order._id, order.customerId, order.purchaseStatus, "failed");
   }
   return { orderId: order._id, orderCode: orderId, status: "FAILED" };
 }
@@ -414,13 +414,10 @@ export async function confirmPaymentService(orderId, customerId) {
     return order;
   }
 
-  order.paymentStatus = "paid";
-  if (order.purchaseStatus === "pending") {
-    order.purchaseStatus = "processing";
-  }
-  await order.save();
+  const newPurchaseStatus = order.purchaseStatus === "pending" ? "processing" : order.purchaseStatus;
+  await updateOrderService(order._id, order.customerId, newPurchaseStatus, "paid");
 
-  return order;
+  return Order.findById(order._id);
 }
 
 export async function cancelPaymentService(orderId, customerId) {
@@ -466,10 +463,8 @@ export async function cancelPaymentService(orderId, customerId) {
   if (order.purchaseStatus === "canceled") {
     return order;
   }
-  order.purchaseStatus = "canceled";
-  order.paymentStatus = "failed";
-  await order.save();
-  return order;
+  await updateOrderService(order._id, order.customerId, "canceled", "failed");
+  return Order.findById(order._id);
 }
 
 export async function handleMomoReturnService(query) {

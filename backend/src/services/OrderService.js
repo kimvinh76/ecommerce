@@ -218,7 +218,7 @@ export async function updateOrderService(
           book.quantity -= item.quantity;
           await book.save({ session });
         }
-      } else if (oldStatus === "processing" && purchaseStatus === "canceled") {
+      } else if (["processing", "delivery"].includes(oldStatus) && purchaseStatus === "canceled") {
         // Tăng inventory
         for (const item of details) {
           const book = await Book.findById(item.bookId).session(session);
