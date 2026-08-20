@@ -1,78 +1,69 @@
 import api from "@/lib/axios";
 
-// Get overview statistics
-export const getOverviewStats = async (from = null, to = null) => {
-    const params = {};
+export const statisticsServices = {
+  getOverviewStats: async (from: string | null = null, to: string | null = null): Promise<any> => {
+    const params: Record<string, string> = {};
     if (from) params.from = from;
     if (to) params.to = to;
     const response = await api.get('/statistics/overview', { params });
     return response.data;
-};
+  },
 
-// Get revenue statistics
-// period: 'day' | 'month' | 'year'
-// from, to: date strings (YYYY-MM-DD)
-export const getRevenueStats = async (period = 'month', from = null, to = null) => {
-    const params = { period };
+  getRevenueStats: async (period: string = 'month', from: string | null = null, to: string | null = null): Promise<any> => {
+    const params: Record<string, string> = { period };
     if (from) params.from = from;
     if (to) params.to = to;
     const response = await api.get('/statistics/revenue', { params });
     return response.data;
-};
+  },
 
-// Get profit statistics
-export const getProfitStats = async (period = 'month', from = null, to = null) => {
-    const params = { period };
+  getProfitStats: async (period: string = 'month', from: string | null = null, to: string | null = null): Promise<any> => {
+    const params: Record<string, string> = { period };
     if (from) params.from = from;
     if (to) params.to = to;
     const response = await api.get('/statistics/profit', { params });
     return response.data;
-};
+  },
 
-// Get top selling products
-export const getTopProducts = async (limit = 10, from = null, to = null) => {
-    const params = { limit };
+  getTopProducts: async (limit: number = 10, from: string | null = null, to: string | null = null): Promise<any> => {
+    const params: Record<string, any> = { limit };
     if (from) params.from = from;
     if (to) params.to = to;
     const response = await api.get('/statistics/top-products', { params });
     return response.data;
-};
+  },
 
-// Get order statistics
-export const getOrderStats = async () => {
+  getOrderStats: async (): Promise<any> => {
     const response = await api.get('/statistics/orders');
     return response.data;
-};
+  },
 
-// Get top categories
-export const getTopCategories = async (limit = 5, from = null, to = null) => {
-    const params = { limit };
+  getTopCategories: async (limit: number = 5, from: string | null = null, to: string | null = null): Promise<any> => {
+    const params: Record<string, any> = { limit };
     if (from) params.from = from;
     if (to) params.to = to;
     const response = await api.get('/statistics/top-categories', { params });
     return response.data;
-};
+  },
 
-// Get payment methods stats
-export const getPaymentMethodsStats = async (from = null, to = null) => {
-    const params = {};
+  getPaymentMethodsStats: async (from: string | null = null, to: string | null = null): Promise<any> => {
+    const params: Record<string, string> = {};
     if (from) params.from = from;
     if (to) params.to = to;
     const response = await api.get('/statistics/payment-methods', { params });
     return response.data;
-};
+  },
 
-// Get comparison stats with previous period
-export const getComparisonStats = async () => {
+  getComparisonStats: async (): Promise<any> => {
     const response = await api.get('/statistics/comparison');
     return response.data;
-};
+  },
 
-// Get order status statistics with date range filtering
-export const getOrderStatusStats = async (from = '', to = '') => {
-    const params = {};
+  getOrderStatusStats: async (from: string = '', to: string = ''): Promise<any> => {
+    const params: Record<string, string> = {};
     if (from) params.from = from;
     if (to) params.to = to;
     const response = await api.get('/statistics/order-status', { params });
     return response.data;
+  }
 };

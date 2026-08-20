@@ -87,4 +87,28 @@ export const supplyReceiptServices = {
       throw error;
     }
   },
+  // Update supply receipt status only
+  updateSupplyReceiptStatus: async (id: string, purchaseStatus: string): Promise<ApiResponse<SupplyReceipt>> => {
+    try {
+      const response = await api.patch<ApiResponse<SupplyReceipt>>(
+        `/supply-receipts/${id}/status`,
+        { purchaseStatus }
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error updating supply receipt status:", error);
+      throw error;
+    }
+  },
+
+  // Get supply receipt statistics
+  getSupplyReceiptStats: async (): Promise<any> => {
+    try {
+      const response = await api.get('/supply-receipts/stats');
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching supply receipt stats:", error);
+      throw error;
+    }
+  },
 };

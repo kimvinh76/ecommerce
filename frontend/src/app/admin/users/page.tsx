@@ -1,17 +1,20 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import useSWR from "swr";
 import { Plus, Pencil, Trash2, Eye, EyeOff, Lock, Unlock } from "lucide-react";
 import Pagination from "../components/Pagination";
 import type { User } from "@/types/user.type";
-import axios from "axios";
-import { baseUrl } from "@/constants/index";
 import Swal from "sweetalert2";
 import toast from "react-hot-toast";
-import { getAllUsers, updateUser, deleteUser, createUser, lockUser, unlockUser } from "@/api/userApi";
+import { userServices } from "@/services/userServices";
 import { useUser } from '@/services/authservices';
 
 export default function UsersPage() {
-  const [users, setUsers] = useState<User[]>([]);
+  const { data: rawUsers = [], isLoading: loading, mutate: fetchUsers } = useSWR("/users", userServices.getAllUsers);
+  
+  // API could return { data: [...] } or direct array
+  const users: User[] = Array.isArray(rawUsers) ? rawUsers : (rawUsers as any).data || [];
+
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [roleFilter, setRoleFilter] = useState<string>("all");
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -19,7 +22,6 @@ export default function UsersPage() {
   const [showModal, setShowModal] = useState<boolean>(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [showFormPassword, setShowFormPassword] = useState<boolean>(false);
-  const [loading, setLoading] = useState<boolean>(true);
   const [emailError, setEmailError] = useState<string>("");
   const { user } = useUser();
   const [phoneError, setPhoneError] = useState<string>("");
@@ -63,25 +65,6 @@ export default function UsersPage() {
     return true;
   };
 
-  // Fetch users from API
-  useEffect(() => {
-    fetchUsers();
-  }, []);
-
-  const fetchUsers = async () => {
-    try {
-      setLoading(true);
-      const response = await getAllUsers();
-      // API có thể trả về { data: [...] } hoặc trực tiếp array
-      const usersData = response.data || response || [];
-      setUsers(Array.isArray(usersData) ? usersData : []);
-    } catch (error) {
-      console.error("Error fetching users:", error);
-      setUsers([]);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   // Lọc user
   const filteredUsers = users.filter((user) => {
@@ -150,7 +133,7 @@ export default function UsersPage() {
           role: formData.role,
           ...(formData.password && { password: formData.password }) // Only include password if provided
         };
-        await updateUser(editingUser._id, updateData);
+        await userServices.updateUser(editingUser._id, updateData);
         Swal.fire({
           icon: 'success',
           title: 'Thành công',
@@ -160,7 +143,7 @@ export default function UsersPage() {
         });
       } else {
         // Create new user
-        await createUser(formData);
+        await userServices.createUser(formData);
         Swal.fire({
           icon: 'success',
           title: 'Thành công',
@@ -196,7 +179,7 @@ export default function UsersPage() {
 
     if (result.isConfirmed) {
       try {
-        await deleteUser(id);
+        await userServices.deleteUser(id);
         toast.success('Xóa người dùng thành công!', {
           position: 'bottom-right',
           duration: 3000,
@@ -232,7 +215,7 @@ export default function UsersPage() {
 
     if (result.isConfirmed) {
       try {
-        await lockUser(id);
+        await userServices.lockUser(id);
         toast.success('Khóa người dùng thành công!', {
           position: 'bottom-right',
           duration: 3000,
@@ -242,8 +225,6 @@ export default function UsersPage() {
           },
         });
         fetchUsers();
-        // optimistic update in case backend is slow
-        setUsers((prev) => prev.map((u) => (u._id === id ? { ...u, isActive: false } : u)));
       } catch (error) {
         console.error("Error locking user:", error);
         Swal.fire({
@@ -270,7 +251,7 @@ export default function UsersPage() {
 
     if (result.isConfirmed) {
       try {
-        await unlockUser(id);
+        await userServices.unlockUser(id);
         toast.success('Mở khóa người dùng thành công!', {
           position: 'bottom-right',
           duration: 3000,
@@ -280,8 +261,6 @@ export default function UsersPage() {
           },
         });
         fetchUsers();
-        // optimistic update in case backend is slow
-        setUsers((prev) => prev.map((u) => (u._id === id ? { ...u, isActive: true } : u)));
       } catch (error) {
         console.error("Error unlocking user:", error);
         Swal.fire({

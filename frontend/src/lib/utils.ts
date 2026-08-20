@@ -1,22 +1,15 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
-import { getJWTfromCookie } from "@/lib/cookies";
-import axios from "axios";
+
+import api from "@/lib/axios";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
 export const fetcher = async (url: string) => {
-  const token = await getJWTfromCookie();
-  return axios
-    .get(url, {
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-        withCredentials: true,
-      },
-    })
+  return api
+    .get(url)
     .then((res) => res.data);
 };
 

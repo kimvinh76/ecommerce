@@ -1,13 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import {
-  getOverviewStats,
-  getProfitStats,
-  getTopProducts,
-  getTopCategories,
-  getPaymentMethodsStats,
-  getComparisonStats,
-} from "@/api/statisticsApi";
+import { statisticsServices } from "@/services/statisticsServices";
 
 // Child components
 import StatCards from "./components/dashboard/StatCards";
@@ -210,8 +203,8 @@ export default function AdminDashboard() {
         setLoading(true);
         setError(null);
         const [overviewRes, comparisonRes] = await Promise.all([
-          (getOverviewStats as any)(dateFrom || undefined, dateTo || undefined),
-          getComparisonStats(),
+          (statisticsServices.getOverviewStats as any)(dateFrom || undefined, dateTo || undefined),
+          statisticsServices.getComparisonStats(),
         ]);
 
         if (overviewRes.success) {
@@ -236,7 +229,7 @@ export default function AdminDashboard() {
     const fetchRevenue = async () => {
       try {
         setRevenueLoading(true);
-        const res = await (getProfitStats as any)(
+        const res = await (statisticsServices.getProfitStats as any)(
           revenueView,
           dateFrom || null,
           dateTo || null,
@@ -261,9 +254,9 @@ export default function AdminDashboard() {
       try {
         setWidgetLoading(true);
         const [productsRes, categoriesRes, paymentRes] = await Promise.all([
-          (getTopProducts as any)(5, dateFrom || null, dateTo || null),
-          (getTopCategories as any)(5, dateFrom || null, dateTo || null),
-          (getPaymentMethodsStats as any)(dateFrom || null, dateTo || null),
+          (statisticsServices.getTopProducts as any)(5, dateFrom || null, dateTo || null),
+          (statisticsServices.getTopCategories as any)(5, dateFrom || null, dateTo || null),
+          (statisticsServices.getPaymentMethodsStats as any)(dateFrom || null, dateTo || null),
         ]);
         if (productsRes.success) setTopProducts(productsRes.data);
         if (categoriesRes.success) setTopCategories(categoriesRes.data);

@@ -178,28 +178,22 @@ export default function OrderOrderDetailPage() {
   const router = useRouter();
   const id = params.id as string;
 
-  const [order, setOrder] = useState<OrderWithDetails | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [isPaying, setIsPaying] = useState(false);
   const fetchCart = useCartStore((state) => state.fetchCart);
-
-  useEffect(() => {
-    const fetchOrder = async () => {
-      try {
-        const res = await orderServices.getOrderDetailById(id);
-        setOrder(res);
-        // Refresh cart state (backend already removed ordered items)
-        await fetchCart();
-      } catch (error) {
-        console.error("Lỗi tải đơn hàng:", error);
+  const [isPaying, setIsPaying] = useState(false);
+  const { data: order, isLoading: loading, error } = useSWR(
+    id ? `/orders/${id}` : null,
+    () => orderServices.getOrderDetailById(id),
+    {
+      onSuccess: () => {
+        // Refresh cart state
+        fetchCart();
+      },
+      onError: (err) => {
+        console.error("Lỗi tải đơn hàng:", err);
         toast.error("Không tìm thấy đơn hàng");
-      } finally {
-        setLoading(false);
       }
-    };
-
-    if (id) fetchOrder();
-  }, [id]);
+    }
+  );
 
   const handleRepayment = async () => {
     if (!order) return;

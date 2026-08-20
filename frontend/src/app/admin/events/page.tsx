@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
+import useSWR from "swr";
 import { Plus, Edit2, Trash2, Check, X, Calendar } from "lucide-react";
 import Swal from "sweetalert2";
 import toast from "react-hot-toast";
@@ -31,14 +32,20 @@ interface Event {
 }
 
 export default function EventsPage() {
-  const [events, setEvents] = useState<Event[]>([]);
-  const [loading, setLoading] = useState(true);
   const [pagination, setPagination] = useState({
     currentPage: 1,
-    totalPages: 1,
-    totalItems: 0,
     limit: 10,
   });
+  
+  const { data: eventsData, mutate: fetchEvents, isLoading: loading } = useSWR(
+    ["/events", pagination.currentPage, pagination.limit],
+    () => getAllEventsApi(pagination.currentPage, pagination.limit)
+  );
+  
+  const events: Event[] = eventsData?.events || [];
+  const totalPages = Math.max(1, eventsData?.totalPages || 1);
+  const totalItems = eventsData?.totalItems || 0;
+
   const [showModal, setShowModal] = useState(false);
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const [books, setBooks] = useState<Book[]>([]);
@@ -64,10 +71,6 @@ export default function EventsPage() {
   }, []);
 
   useEffect(() => {
-    fetchEvents();
-  }, [pagination.currentPage, pagination.limit]);
-
-  useEffect(() => {
     if (formError) {
       setFormError(null);
     }
@@ -75,28 +78,6 @@ export default function EventsPage() {
       setFormErrors({});
     }
   }, [formData]);
-
-  const fetchEvents = async () => {
-    try {
-      setLoading(true);
-      const result = await getAllEventsApi(
-        pagination.currentPage,
-        pagination.limit
-      );
-      setEvents(result.events as Event[]);
-      setPagination((prev) => ({
-        ...prev,
-        totalItems: result.totalItems,
-        totalPages: Math.max(1, result.totalPages),
-        currentPage: result.currentPage,
-      }));
-    } catch (error) {
-      toast.error("Lỗi tải sự kiện");
-      console.error(error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const fetchBooks = async () => {
     try {
@@ -310,18 +291,9 @@ export default function EventsPage() {
 
     try {
       setStatusUpdatingId(eventId);
-      const updated = await updateEventStatusApi(eventId, nextStatus);
+      await updateEventStatusApi(eventId, nextStatus);
 
-      setEvents((prev) =>
-        prev.map((event) =>
-          event._id === eventId
-            ? {
-                ...event,
-                status: (updated?.status as EventStatus) || nextStatus,
-              }
-            : event
-        )
-      );
+      fetchEvents();
 
       toast.success("Cập nhật trạng thái thành công");
     } catch (error: any) {
@@ -507,8 +479,8 @@ export default function EventsPage() {
             <div className="px-6 pb-6">
               <Pagination
                 currentPage={pagination.currentPage}
-                totalPages={pagination.totalPages}
-                totalItems={pagination.totalItems}
+                totalPages={totalPages}
+                totalItems={totalItems}
                 itemsPerPage={pagination.limit}
                 onPageChange={(page) =>
                   setPagination((prev) => ({ ...prev, currentPage: page }))

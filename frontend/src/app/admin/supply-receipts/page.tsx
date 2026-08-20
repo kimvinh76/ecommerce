@@ -1,10 +1,11 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import useSWR from "swr";
 import { Plus, Pencil, Trash2, Loader2, RefreshCw, Eye } from "lucide-react";
 import Swal from "sweetalert2";
-import { getAllSupplyReceipts, createSupplyReceipt, updateSupplyReceipt, updateSupplyReceiptStatus } from "@/api/supplreceiptApi";
-import { getAllSuppliers } from "@/api/supplierApi";
-import { getAllBooks } from "@/api/bookApi";
+import { supplyReceiptServices } from "@/services/supplyReceiptServices";
+import { supplierServices } from "@/services/supplierServices";
+import { bookServices } from "@/services/bookServices";
 import SearchableSelect from "@/components/SearchableSelect";
 import type { SupplyReceipt, SupplyItem } from "@/types/supplyreceipt.type";
 import type { Supplier } from "@/types/supplier.type";
@@ -12,22 +13,62 @@ import type { Book } from "@/types/book.type";
 import Pagination from "../components/Pagination";
 
 export default function SupplyReceiptsPage() {
-  const [receipts, setReceipts] = useState<SupplyReceipt[]>([]);
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [books, setBooks] = useState<Book[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [showModal, setShowModal] = useState(false);
-  const [editing, setEditing] = useState<SupplyReceipt | null>(null);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [itemsPerPage, setItemsPerPage] = useState<number>(5);
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [totalItems, setTotalItems] = useState(0);
-  const [statusCounts, setStatusCounts] = useState({
-    all: 0,
-    pending: 0,
-    completed: 0,
-    canceled: 0,
-  });
+  const [showModal, setShowModal] = useState(false);
+  const [editing, setEditing] = useState<SupplyReceipt | null>(null);
+
+  // --- SWR Hooks ---
+  const { data: rawSuppliers = [] } = useSWR("/suppliers", supplierServices.getAllSuppliers);
+  const suppliers: Supplier[] = (rawSuppliers as any).data || rawSuppliers || [];
+  const mappedSuppliers = suppliers.map((s: any) => ({ id: s._id || s.id, name: s.name, phone: s.phone, email: s.email, address: s.address }));
+
+  const { data: rawBooks = [] } = useSWR("/books?limit=1000", () => bookServices.getAllBooks({ limit: 1000 }));
+  const books: Book[] = (rawBooks as any).data || rawBooks || [];
+  const mappedBooks = books.map((b: any) => ({ id: b._id || b.id, name: b.name, price: b.price }));
+
+  const fetchParams: any = { page: currentPage, limit: itemsPerPage };
+  if (statusFilter !== "all") fetchParams.status = statusFilter;
+  
+  const { data: receiptsResponse, mutate: fetchReceipts, isLoading: loading } = useSWR(
+    ["/supply-receipts", fetchParams],
+    () => supplyReceiptServices.getAllSupplyReceipts(fetchParams)
+  );
+
+  const { data: allReceiptsResponse } = useSWR(
+    "/supply-receipts/all",
+    () => supplyReceiptServices.getAllSupplyReceipts({ page: 1, limit: 1000 })
+  );
+
+  const receiptsData = receiptsResponse?.data || [];
+  const allReceipts = allReceiptsResponse?.data || [];
+
+  const receipts: SupplyReceipt[] = receiptsData.map((r: any) => ({
+    id: r._id,
+    supplier_id: r.supplierId?._id || r.supplierId,
+    supplier_name: r.supplierId?.name || "Không rõ",
+    admin_id: r.adminId?._id || r.adminId,
+    supply_date: r.supplyDate,
+    supply_status: r.purchaseStatus,
+    total_amount: r.totalAmount || 0,
+    items: (r.details || []).map((d: any) => ({
+      book_id: d.bookId?._id || d.bookId,
+      book_name: d.bookId?.name || "Không rõ",
+      import_price: d.importPrice,
+      quantity: d.quantity,
+      sub_amount: d.importPrice * d.quantity,
+    })),
+  }));
+
+  const totalItems = receiptsResponse?.pagination?.total || receipts.length;
+  
+  const statusCounts = {
+    all: allReceipts.length,
+    pending: allReceipts.filter((r: any) => r.purchaseStatus === "pending").length,
+    completed: allReceipts.filter((r: any) => r.purchaseStatus === "completed").length,
+    canceled: allReceipts.filter((r: any) => r.purchaseStatus === "canceled").length,
+  };
   const [formErrors, setFormErrors] = useState<{
     supplier_id?: string;
     supply_date?: string;
@@ -35,94 +76,7 @@ export default function SupplyReceiptsPage() {
     itemErrors?: Array<{ book_id?: string; quantity?: string; import_price?: string }>;
   }>({});
 
-  // Fetch data từ API
-  const fetchReceipts = async () => {
-    try {
-      setLoading(true);
-      const params: any = {
-        page: currentPage,
-        limit: itemsPerPage,
-      };
-      if (statusFilter !== "all") {
-        params.status = statusFilter;
-      }
-      const response = await getAllSupplyReceipts(params);
 
-      // Map dữ liệu từ backend sang frontend format
-      const mappedReceipts = (response.data || []).map((r: any) => ({
-        id: r._id,
-        supplier_id: r.supplierId?._id || r.supplierId,
-        supplier_name: r.supplierId?.name || "Không rõ",
-        admin_id: r.adminId?._id || r.adminId,
-        supply_date: r.supplyDate,
-        supply_status: r.purchaseStatus,
-        total_amount: r.totalAmount || 0,
-        items: (r.details || []).map((d: any) => ({
-          book_id: d.bookId?._id || d.bookId,
-          book_name: d.bookId?.name || "Không rõ",
-          import_price: d.importPrice,
-          quantity: d.quantity,
-          sub_amount: d.importPrice * d.quantity,
-        })),
-      }));
-
-      setReceipts(mappedReceipts);
-      setTotalItems(response.pagination?.total || mappedReceipts.length);
-
-      // Fetch thống kê số lượng theo trạng thái
-      const allResponse = await getAllSupplyReceipts({ limit: 1000 });
-      const allReceipts = allResponse.data || [];
-      setStatusCounts({
-        all: allReceipts.length,
-        pending: allReceipts.filter((r: any) => r.purchaseStatus === "pending").length,
-        completed: allReceipts.filter((r: any) => r.purchaseStatus === "completed").length,
-        canceled: allReceipts.filter((r: any) => r.purchaseStatus === "canceled").length,
-      });
-    } catch (error) {
-      console.error("Error fetching receipts:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchSuppliers = async () => {
-    try {
-      const response = await getAllSuppliers();
-      const mappedSuppliers = (response.data || response || []).map((s: any) => ({
-        id: s._id,
-        name: s.name,
-        phone: s.phone,
-        email: s.email,
-        address: s.address,
-      }));
-      setSuppliers(mappedSuppliers);
-    } catch (error) {
-      console.error("Error fetching suppliers:", error);
-    }
-  };
-
-  const fetchBooks = async () => {
-    try {
-      const response = await getAllBooks({ limit: 1000 });
-      const mappedBooks = (response.data || response || []).map((b: any) => ({
-        id: b._id,
-        name: b.name,
-        price: b.price,
-      }));
-      setBooks(mappedBooks);
-    } catch (error) {
-      console.error("Error fetching books:", error);
-    }
-  };
-
-  useEffect(() => {
-    fetchSuppliers();
-    fetchBooks();
-  }, []);
-
-  useEffect(() => {
-    fetchReceipts();
-  }, [currentPage, itemsPerPage, statusFilter]);
 
   // Pagination đã được xử lý từ API
   const totalPages = Math.ceil(totalItems / itemsPerPage);
@@ -143,11 +97,9 @@ export default function SupplyReceiptsPage() {
     items: [],
   });
 
-  useEffect(() => {
-    if (Object.keys(formErrors).length > 0) {
-      setFormErrors({});
-    }
-  }, [formData]);
+  if (Object.keys(formErrors).length > 0) {
+    // using clear trick instead of useEffect, wait, let's just clear manually in resetForm/openModal
+  }
 
   // Tính tổng tiền
   const calcTotal = (items: SupplyItem[]) =>
@@ -214,7 +166,7 @@ export default function SupplyReceiptsPage() {
     const newItems = [...formData.items];
     const updatedItem = { ...newItems[index], [field]: value };
     if (field === "book_id") {
-      const selectedBook = books.find((b: any) => b.id === value);
+      const selectedBook = mappedBooks.find((b: any) => b.id === value);
       updatedItem.book_name = selectedBook?.name || updatedItem.book_name || "";
     }
     updatedItem.sub_amount = updatedItem.import_price * updatedItem.quantity;
@@ -283,7 +235,7 @@ export default function SupplyReceiptsPage() {
 
     try {
       // Map dữ liệu sang format backend
-      const apiData: any = {
+      const formattedData: any = {
         supplierId: formData.supplier_id,
         supplyDate: formData.supply_date,
         details: formData.items.map((item) => ({
@@ -295,12 +247,12 @@ export default function SupplyReceiptsPage() {
 
       // Khong gui purchaseStatus khi tao/sua chi tiet, backend se mac dinh pending luc tao.
 
-      console.log("Sending data:", apiData); // Debug
+      console.log("Sending data:", formattedData); // Debug
 
       if (editing) {
-        await updateSupplyReceipt(editing.id, apiData);
+        await supplyReceiptServices.updateSupplyReceipt(editing.id, formattedData);
       } else {
-        await createSupplyReceipt(apiData);
+        await supplyReceiptServices.createSupplyReceipt(formattedData);
       }
 
       resetForm();
@@ -337,7 +289,7 @@ export default function SupplyReceiptsPage() {
     if (!statusReceipt || !newStatus) return;
 
     try {
-      await updateSupplyReceiptStatus(statusReceipt.id, newStatus);
+      await supplyReceiptServices.updateSupplyReceiptStatus(statusReceipt.id, newStatus);
 
       if (editing?.id === statusReceipt.id) {
         setEditing((prev) => (prev ? { ...prev, supply_status: newStatus as SupplyReceipt["supply_status"] } : prev));
@@ -458,7 +410,7 @@ export default function SupplyReceiptsPage() {
                   </tr>
                 ) : (
                   receipts.map((r: SupplyReceipt) => {
-                    const supplierName = (r as any).supplier_name || suppliers.find((s: any) => s.id === r.supplier_id)?.name || "Không rõ";
+                    const supplierName = (r as any).supplier_name || mappedSuppliers.find((s: any) => s.id === r.supplier_id)?.name || "Không rõ";
                     return (
                       <tr key={r.id} className="border-t border-gray-200 hover:bg-gray-50 transition-all duration-200">
                         <td className="px-4 py-4 text-gray-800 font-medium">{r.id.slice(-8)}</td>
@@ -560,7 +512,7 @@ export default function SupplyReceiptsPage() {
                   if (isReadonlyEdit) return;
                   setFormData({ ...formData, supplier_id: value });
                 }}
-                options={suppliers.map((s: any) => ({ _id: s.id, name: s.name }))}
+                options={mappedSuppliers.map((s: any) => ({ _id: s.id, name: s.name }))}
                 placeholder="Chọn nhà cung cấp"
                 disabled={isReadonlyEdit}
               />
@@ -606,7 +558,7 @@ export default function SupplyReceiptsPage() {
                           onChange={(value: string) =>
                             updateItem(index, "book_id", value)
                           }
-                          options={books.map((b: any) => ({ _id: b.id, name: b.name }))}
+                          options={mappedBooks.map((b: any) => ({ _id: b.id, name: b.name }))}
                           placeholder="Chọn sách"
                           disabled={isReadonlyEdit}
                         />
