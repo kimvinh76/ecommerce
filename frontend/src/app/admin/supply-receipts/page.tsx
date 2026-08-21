@@ -33,12 +33,12 @@ export default function SupplyReceiptsPage() {
   
   const { data: receiptsResponse, mutate: fetchReceipts, isLoading: loading } = useSWR(
     ["/supply-receipts", fetchParams],
-    () => supplyReceiptServices.getAllSupplyReceipts(fetchParams)
+    () => supplyReceiptServices.getAllSupplyReceipts(fetchParams.page, fetchParams.limit, fetchParams.status)
   );
 
   const { data: allReceiptsResponse } = useSWR(
     "/supply-receipts/all",
-    () => supplyReceiptServices.getAllSupplyReceipts({ page: 1, limit: 1000 })
+    () => supplyReceiptServices.getAllSupplyReceipts(1, 1000)
   );
 
   const receiptsData = receiptsResponse?.data || [];
@@ -61,7 +61,7 @@ export default function SupplyReceiptsPage() {
     })),
   }));
 
-  const totalItems = receiptsResponse?.pagination?.total || receipts.length;
+  const totalItems = receiptsResponse?.pagination?.totalItems || receipts.length;
   
   const statusCounts = {
     all: allReceipts.length,

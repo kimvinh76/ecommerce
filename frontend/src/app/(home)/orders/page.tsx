@@ -11,6 +11,11 @@ import { AddressSelectionDialog } from "@/components/order/AddressSelectionDialo
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
+import { CheckoutAddressCard } from "./_components/CheckoutAddressCard";
+import { OrderDetailsCard } from "./_components/OrderDetailsCard";
+import { PaymentMethodCard } from "./_components/PaymentMethodCard";
+import { OrderSummaryCard } from "./_components/OrderSummaryCard";
+
 
 import {
   Dialog,
@@ -49,7 +54,7 @@ import { createPayment } from "@/services/PaymentService";
 import { useUser } from "@/services/authservices";
 import { validateCoupon } from "@/services/couponService";
 import { useAuthDialog } from "@/components/auth-dialog-context";
-
+import router from "next/router";
 
 const getLastAddressStorageKey = (userId?: string) =>
   userId ? `last_checkout_address_${userId}` : "last_checkout_address_guest";
@@ -59,6 +64,12 @@ const OrderPage = () => {
   const { setOpen: setAuthDialogOpen, setMode: setAuthDialogMode } = useAuthDialog();
 
   const { addresses, isLoading: addressLoading, mutate } = getAllAddress();
+
+  // CHÚ THÍCH: Lấy dữ liệu giỏ hàng (cart) từ global state (Zustand).
+  // Zustand giống như một "kho chứa dữ liệu chung" cho toàn bộ ứng dụng (Global State). 
+  // Tại sao dùng Zustand thay vì gọi API (fetch) trực tiếp ở đây?
+  // -> Vì thông tin giỏ hàng (số lượng, tổng tiền) cần được dùng ở rất nhiều nơi (như số hiển thị trên nút Giỏ hàng ở Header). 
+  // -> Nếu trang nào cũng gọi API thì sẽ tốn tài nguyên và dữ liệu không đồng bộ. Dùng Zustand giúp lấy dữ liệu nhanh và khi giỏ hàng đổi thì Header cũng tự cập nhật theo ngay lập tức.
   const cart = useCartStore((s) => s.cart);
   const checkoutItems = useCartStore((s) => s.checkoutItems);
   const fetchCart = useCartStore((s) => s.fetchCart);
@@ -75,10 +86,13 @@ const OrderPage = () => {
   const [discountAmount, setDiscountAmount] = useState(0);
   const [isApplyingCoupon, setIsApplyingCoupon] = useState(false);
 
-  // Monitor for deleted products during checkout
+  // CHÚ THÍCH: Hook tự tạo (Custom Hook) dùng để theo dõi (Monitor).
+  // Đang thanh toán mà Admin bỗng dưng xóa sản phẩm đó khỏi kho thì sao?
+  // Hook này sẽ theo dõi liên tục, nếu phát hiện sản phẩm bị xóa, nó sẽ báo lỗi và đẩy user về lại trang Giỏ hàng.
   useProductDeletionMonitor();
 
-  // Validate cart items on page load (checkout-specific)
+  // CHÚ THÍCH: useEffect là một Hook cốt lõi của React, dùng để chạy những "hành động phụ" (Side effects).
+  // useEffect sẽ chạy MỘT LẦN ngay khi giao diện vừa load xong, hoặc chạy lại khi các biến ở trong ngoặc vuông (Dependencies array) bị thay đổi.
   useEffect(() => {
     const validateCheckoutItems = async () => {
       if (!cart || cart.items.length === 0 || !checkoutItems || checkoutItems.length === 0) {
@@ -118,6 +132,7 @@ const OrderPage = () => {
     validateCheckoutItems();
   }, [cart, checkoutItems, fetchCart, router]);
 
+  // CHÚ THÍCH: Nếu user chưa đăng nhập, tự động bật Hộp thoại yêu cầu Đăng nhập.
   // Auto-open auth dialog when user tries to checkout without login
   useEffect(() => {
     if (!userLoading && !user) {
@@ -129,6 +144,10 @@ const OrderPage = () => {
   useEffect(() => {
     fetchCart();
   }, [fetchCart]);
+
+  // CHÚ THÍCH: Khởi tạo form bằng useForm (React Hook Form) kết hợp với Zod (zodResolver).
+  // - useForm: Quản lý toàn bộ dữ liệu người dùng gõ vào form cực nhanh mà không làm màn hình bị giật (re-render).
+  // - zodResolver: Tạo ra cái khiên bảo vệ, ép người dùng phải nhập đúng quy tắc (ví dụ: Tên không được rỗng) trước khi cho bấm Thanh toán.
   const {
     control,
     handleSubmit,
@@ -146,512 +165,354 @@ const OrderPage = () => {
       paymentMethod: "COD",
     },
   });
-  const receiverName = watch("receiverName");
-  const receiverPhone = watch("receiverPhone");
-  const receiverAddress = watch("receiverAddress");
-  useEffect(() => {
-    if (cart && cart.items.length > 0) {
-      // Filter items to only include selected ones for checkout
-      const itemsToCheckout =
-        checkoutItems && checkoutItems.length > 0
-          ? cart.items.filter((item) => checkoutItems.includes(item._id))
-          : cart.items;
 
-      const formItems: ItemCart[] = itemsToCheckout.map((item) => ({
-        bookId: item.bookId,
-        quantity: item.quantity,
-        price: item.price,
-      }));
-      setValue("details", formItems, { shouldValidate: true });
-    } else if (cart && cart.items.length === 0) {
-      router.push("/");
-    }
-  }, [cart, checkoutItems, setValue, router]);
-  useEffect(() => {
-    if (!addresses || addresses.length === 0 || didInitCheckoutAddress) {
-      return;
-    }
+//  Hàm watch() của react-hook-form giúp ta "nhìn lén" xem người dùng đang gõ gì vào ô input, 
+// từ đó ta gán vào biến (ví dụ receiverName) để truyền xuống dưới thẻ Component con hiển thị.
+const receiverName = watch("receiverName");
+const receiverPhone = watch("receiverPhone");
+const receiverAddress = watch("receiverAddress");
 
-    // Only auto-select once and only when shipping address is still empty.
-    if (getValues("receiverAddress")) {
-      setDidInitCheckoutAddress(true);
-      return;
-    }
+useEffect(() => {
+  if (cart && cart.items.length > 0) {
+    // Filter items to only include selected ones for checkout
+    const itemsToCheckout =
+      checkoutItems && checkoutItems.length > 0
+        ? cart.items.filter((item) => checkoutItems.includes(item._id))
+        : cart.items;
 
-    const defaultAddr =
-      addresses.find((addr: Address) => addr.isDefault) || addresses[0];
-
-    if (defaultAddr) {
-      fillAddressToForm(defaultAddr);
-      if (defaultAddr._id && typeof window !== "undefined") {
-        window.localStorage.setItem(
-          getLastAddressStorageKey(user?.data?._id),
-          defaultAddr._id,
-        );
-      }
-    }
-
-    setDidInitCheckoutAddress(true);
-  }, [addresses, didInitCheckoutAddress, getValues, user?.data?._id]);
-
-  useEffect(() => {
-    const profile = user?.data;
-    if (!profile) return;
-
-    if (!getValues("receiverName") && profile.fullName) {
-      setValue("receiverName", profile.fullName, { shouldValidate: true });
-    }
-    if (!getValues("receiverPhone") && profile.phone) {
-      setValue("receiverPhone", profile.phone, { shouldValidate: true });
-    }
-  }, [user, getValues, setValue]);
-
-  const fillAddressToForm = (addr: Address) => {
-    const fullAddress = `${addr.detail}, ${addr.district}, ${addr.province}`;
-    const profile = user?.data;
-
-    setValue("receiverName", profile?.fullName || addr.name, {
-      shouldValidate: true,
-    });
-    setValue("receiverPhone", profile?.phone || addr.phone, {
-      shouldValidate: true,
-    });
-    setValue("receiverAddress", fullAddress, { shouldValidate: true });
-    setIsDefaultAddress(Boolean(addr.isDefault));
-  };
-
-  const handleSelectAddress = (addr: Address) => {
-    if (addr._id && typeof window !== "undefined") {
-      window.localStorage.setItem(
-        getLastAddressStorageKey(user?.data?._id),
-        addr._id,
-      );
-    }
-    fillAddressToForm(addr);
-    setOpenAddressDialog(false);
-  };
-
-  const handleSuccessCreateAddr = async (addr: Address) => {
-    setOpenCreateAddress(false);
-    await mutate();
-    if (addr._id && typeof window !== "undefined") {
-      window.localStorage.setItem(
-        getLastAddressStorageKey(user?.data?._id),
-        addr._id,
-      );
-    }
-    fillAddressToForm(addr);
-  };
-
-  const onSubmit = async (data: OrderPayload) => {
-    try {
-      if (data.paymentMethod === "CARD") {
-        toast.info(
-          "Chức năng chưa được hỗ trợ. Vui lòng chọn phương thức thanh toán khác!",
-        );
-        return;
-      }
-
-      // Validate that all items in the order still exist in cart
-      if (!data.details || data.details.length === 0) {
-        toast.error("Giỏ hàng của bạn trống. Vui lòng quay lại trang giỏ hàng.");
-        router.push("/cart");
-        return;
-      }
-
-      // Verify each item still exists in the current cart
-      for (const orderItem of data.details) {
-        const cartItem = cart?.items.find(item => item.bookId === orderItem.bookId);
-        if (!cartItem) {
-          toast.error(
-            `Sản phẩm không còn tồn tại trong giỏ hàng. Vui lòng kiểm tra lại.`,
-          );
-          await fetchCart();
-          return;
-        }
-        if (cartItem.quantity < orderItem.quantity) {
-          toast.error(
-            `Số lượng sản phẩm "${orderItem.bookId}" không đủ. Vui lòng kiểm tra lại.`,
-          );
-          await fetchCart();
-          return;
-        }
-      }
-
-      const payload: OrderPayload = {
-        ...data,
-        couponCode: appliedCouponCode || undefined,
-      };
-      const res: Order = await orderServices.createOrder(payload);
-      if (res.paymentMethod === "MOMO") {
-        const paymentRes = await createPayment(res._id);
-        if (!paymentRes?.ok) {
-          const errorMessage =
-            paymentRes && "message" in paymentRes
-              ? paymentRes.message
-              : "Không thể tạo thanh toán MoMo";
-          toast.error(errorMessage);
-          return;
-        }
-        const isMobile =
-          typeof navigator !== "undefined" &&
-          /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-        const paymentUrl = isMobile
-          ? paymentRes?.payment?.deeplink || paymentRes?.payment?.paymentUrl
-          : paymentRes?.payment?.paymentUrl || paymentRes?.payment?.deeplink;
-        const qrCodeUrl = paymentRes?.payment?.qrCodeUrl;
-        if (!paymentUrl) {
-          if (qrCodeUrl) {
-            toast.info(
-              "MoMo đang tạm lỗi, hệ thống chuyển sang thanh toán QR chuyển khoản.",
-            );
-            router.push(`/payment/transfer/${res._id}`);
-            return;
-          }
-          toast.error("Không tạo được link thanh toán MoMo");
-          return;
-        }
-        toast.success("Đang chuyển sang cổng thanh toán MoMo...");
-        window.location.href = paymentUrl;
-        return;
-      } else if (res.paymentMethod === "PAYOS") {
-        const paymentRes = await createPayment(res._id);
-        if (!paymentRes?.ok) {
-          const errorMessage =
-            paymentRes && "message" in paymentRes
-              ? paymentRes.message
-              : "Không thể tạo thanh toán";
-          toast.error(errorMessage);
-          return;
-        }
-        toast.success("Vui lòng quét mã QR để thanh toán.");
-        router.push(`/payment/transfer/${res._id}`);
-      } else if (res.paymentMethod === "COD") {
-        router.push(`/orders/${res._id}`);
-        toast.success("Đặt hàng thành công!");
-      }
-    } catch (error: any) {
-      console.error(error);
-      const message =
-        error?.response?.data?.message ||
-        error?.message ||
-        "Có lỗi xảy ra khi tạo đơn hàng";
-      toast.error(message);
-    }
-  };
-
-  if ((!cart && cartLoading) || addressLoading)
-    return <div className="text-center p-10">Loading...</div>;
-
-  // If not authenticated, auth dialog will open globally via useEffect
-  // No need to show anything here
-  if (!user) {
-    return null;
+    const formItems: ItemCart[] = itemsToCheckout.map((item) => ({
+      bookId: item.bookId,
+      quantity: item.quantity,
+      price: item.price,
+    }));
+    setValue("details", formItems, { shouldValidate: true });
+  } else if (cart && cart.items.length === 0) {
+    router.push("/");
+  }
+}, [cart, checkoutItems, setValue, router]);
+useEffect(() => {
+  if (!addresses || addresses.length === 0 || didInitCheckoutAddress) {
+    return;
   }
 
-  if (!cart) return null;
+  // Only auto-select once and only when shipping address is still empty.
+  if (getValues("receiverAddress")) {
+    setDidInitCheckoutAddress(true);
+    return;
+  }
 
-  // Filter items to only show selected ones for checkout
-  const displayItems =
-    checkoutItems && checkoutItems.length > 0
-      ? cart.items.filter((item) => checkoutItems.includes(item._id))
-      : cart.items;
+  const defaultAddr =
+    addresses.find((addr: Address) => addr.isDefault) || addresses[0];
 
-  // Calculate total for displayed items only
-  const displayTotal = displayItems.reduce(
-    (sum, item) => sum + item.price * item.quantity,
-    0,
-  );
-  const finalTotal = Math.max(0, displayTotal - discountAmount);
+  if (defaultAddr) {
+    fillAddressToForm(defaultAddr);
+    if (defaultAddr._id && typeof window !== "undefined") {
+      window.localStorage.setItem(
+        getLastAddressStorageKey(user?.data?._id),
+        defaultAddr._id,
+      );
+    }
+  }
 
-  const handleApplyCoupon = async () => {
-    const code = couponCode.trim();
-    if (!code) {
-      toast.error("Vui lòng nhập mã giảm giá");
+  setDidInitCheckoutAddress(true);
+}, [addresses, didInitCheckoutAddress, getValues, user?.data?._id]);
+
+useEffect(() => {
+  const profile = user?.data;
+  if (!profile) return;
+
+  if (!getValues("receiverName") && profile.fullName) {
+    setValue("receiverName", profile.fullName, { shouldValidate: true });
+  }
+  if (!getValues("receiverPhone") && profile.phone) {
+    setValue("receiverPhone", profile.phone, { shouldValidate: true });
+  }
+}, [user, getValues, setValue]);
+
+const fillAddressToForm = (addr: Address) => {
+  const fullAddress = `${addr.detail}, ${addr.district}, ${addr.province}`;
+  const profile = user?.data;
+
+  setValue("receiverName", profile?.fullName || addr.name, {
+    shouldValidate: true,
+  });
+  setValue("receiverPhone", profile?.phone || addr.phone, {
+    shouldValidate: true,
+  });
+  setValue("receiverAddress", fullAddress, { shouldValidate: true });
+  setIsDefaultAddress(Boolean(addr.isDefault));
+};
+
+const handleSelectAddress = (addr: Address) => {
+  if (addr._id && typeof window !== "undefined") {
+    window.localStorage.setItem(
+      getLastAddressStorageKey(user?.data?._id),
+      addr._id,
+    );
+  }
+  fillAddressToForm(addr);
+  setOpenAddressDialog(false);
+};
+
+const handleSuccessCreateAddr = async (addr: Address) => {
+  setOpenCreateAddress(false);
+  await mutate();
+  if (addr._id && typeof window !== "undefined") {
+    window.localStorage.setItem(
+      getLastAddressStorageKey(user?.data?._id),
+      addr._id,
+    );
+  }
+  fillAddressToForm(addr);
+};
+
+const onSubmit = async (data: OrderPayload) => {
+  try {
+    if (data.paymentMethod === "CARD") {
+      toast.info(
+        "Chức năng chưa được hỗ trợ. Vui lòng chọn phương thức thanh toán khác!",
+      );
       return;
     }
 
-    try {
-      setIsApplyingCoupon(true);
-      const response = await validateCoupon(code, displayTotal);
-      if (!response?.ok || !response?.coupon) {
-        toast.error("Mã giảm giá không hợp lệ");
+    // Validate that all items in the order still exist in cart
+    if (!data.details || data.details.length === 0) {
+      toast.error("Giỏ hàng của bạn trống. Vui lòng quay lại trang giỏ hàng.");
+      router.push("/cart");
+      return;
+    }
+
+    // Kiểm tra lại lần cuối trước khi tạo đơn xem các sản phẩm trong giỏ còn đủ số lượng không
+    for (const orderItem of data.details) {
+      const cartItem = cart?.items.find(item => item.bookId === orderItem.bookId);
+      if (!cartItem) {
+        toast.error(
+          `Sản phẩm không còn tồn tại trong giỏ hàng. Vui lòng kiểm tra lại.`,
+        );
+        await fetchCart();
         return;
       }
-
-      setAppliedCouponCode(response.coupon.code);
-      setDiscountAmount(response.coupon.discountAmount || 0);
-      toast.success(
-        `Áp mã thành công, giảm ${formatPrice(response.coupon.discountAmount || 0)}`,
-      );
-    } catch (error: any) {
-      const message =
-        error?.response?.data?.message || "Không áp dụng được mã giảm giá";
-      toast.error(message);
-      setAppliedCouponCode("");
-      setDiscountAmount(0);
-    } finally {
-      setIsApplyingCoupon(false);
+      if (cartItem.quantity < orderItem.quantity) {
+        toast.error(
+          `Số lượng sản phẩm "${orderItem.bookId}" không đủ. Vui lòng kiểm tra lại.`,
+        );
+        await fetchCart();
+        return;
+      }
     }
-  };
 
-  const handleRemoveCoupon = () => {
-    setCouponCode("");
-    setAppliedCouponCode("");
-    setDiscountAmount(0);
-  };
+    // Gọi API tạo đơn hàng mới trên hệ thống
+    const payload: OrderPayload = {
+      ...data,
+      couponCode: appliedCouponCode || undefined,
+    };
+    const res: Order = await orderServices.createOrder(payload);
 
-  return (
-    <div className="min-h-screen bg-gray-50/50 py-8 px-4 md:px-6">
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center gap-2 mb-6">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setOpenCancel(true)}
-            className="rounded-full"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
-          <DialogCancelPayment
-            open={openCancel}
-            onOpenChange={setOpenCancel}
-            onConfirm={() => router.push("/")}
-          />
-          <h1 className="text-2xl font-bold text-gray-900">
-            Thanh toán đơn hàng
-          </h1>
-        </div>
-
-        <form
-          onSubmit={handleSubmit(onSubmit, (err) => console.log(err))}
-          className="grid grid-cols-1 lg:grid-cols-12 gap-8 relative"
-        >
-          <div className="lg:col-span-8 space-y-6">
-            {/* 1. Address Section */}
-            <Card
-              className={`border-none shadow-sm ring-1 ${errors.receiverName ? "ring-red-500" : "ring-gray-200"}`}
-            >
-              <CardHeader className="flex flex-row items-center justify-between pb-4">
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <MapPin className="w-5 h-5 text-red-600" /> Địa chỉ nhận hàng
-                </CardTitle>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setOpenAddressDialog(true)}
-                  className="text-blue-600 h-8 font-medium"
-                >
-                  {receiverAddress ? "Thay đổi" : "Chọn địa chỉ"}
-                </Button>
-              </CardHeader>
-              <CardContent>
-                {/* Logic hiển thị: Dựa vào field watch được từ form */}
-                {receiverAddress ? (
-                  <div className="bg-gray-50 p-4 rounded-lg border border-gray-100">
-                    <div className="font-bold text-gray-900 mb-1 flex items-center gap-2">
-                      <span>{receiverName}</span>
-                      <span className="w-[1px] h-4 bg-gray-300"></span>
-                      <span>{receiverPhone}</span>
-                      {isDefaultAddress && (
-                        <>
-                          <span className="w-[1px] h-4 bg-gray-300"></span>
-                          <Badge
-                            variant="secondary"
-                            className="bg-blue-50 text-blue-700 border-blue-100"
-                          >
-                            Mặc định
-                          </Badge>
-                        </>
-                      )}
-                    </div>
-                    <p className="text-gray-700 text-sm">{receiverAddress}</p>
-                  </div>
-                ) : (
-                  <div className="text-sm text-gray-500 italic p-2 border border-dashed rounded text-center">
-                    Vui lòng chọn địa chỉ để giao hàng
-                  </div>
-                )}
-
-                {/* Hiển thị lỗi nếu thiếu 1 trong các trường */}
-                {(errors.receiverName || errors.receiverAddress) && (
-                  <p className="text-red-500 text-sm mt-2 font-medium">
-                    ⚠️ Vui lòng chọn địa chỉ nhận hàng đầy đủ.
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* 2. Order Details Section */}
-            <Card className="border-none shadow-sm ring-1 ring-gray-200">
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Package className="w-5 h-5 text-gray-500" /> Chi tiết đơn
-                  hàng
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="grid gap-4 divide-y">
-                {errors.details && (
-                  <p className="text-red-500 text-sm font-medium px-2">
-                    {errors.details.message}
-                  </p>
-                )}
-
-                {displayItems.map((item) => (
-                  <div key={item._id} className="pt-4 first:pt-0">
-                    <OrderItem
-                      bookId={item.bookId}
-                      quantity={item.quantity}
-                      price={item.price}
-                    />
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Right Column */}
-          <div className="lg:col-span-4">
-            <div className="sticky top-6 space-y-4">
-              {/* Payment Method */}
-              <Card className="border-none shadow-sm ring-1 ring-gray-200">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base font-bold flex items-center gap-2">
-                    <Wallet className="w-4 h-4 text-blue-600" /> Phương thức
-                    thanh toán
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <Controller
-                    name="paymentMethod"
-                    control={control}
-                    render={({ field }) => (
-                      <RadioGroup
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                        className="grid gap-3"
-                      >
-                        <PaymentOption
-                          value="COD"
-                          label="Thanh toán khi nhận hàng (COD)"
-                          icon={
-                            <Banknote className="text-orange-600 w-5 h-5" />
-                          }
-                          selected={field.value}
-                        />
-                        <PaymentOption
-                          value="MOMO"
-                          label="Thanh toán MoMo"
-                          icon={<QrCode className="text-green-600 w-5 h-5" />}
-                          selected={field.value}
-                        />
-
-                      </RadioGroup>
-                    )}
-                  />
-                </CardContent>
-              </Card>
-
-              {/* Total & Submit */}
-              <Card className="border-none shadow-md ring-1 ring-gray-200 overflow-hidden">
-                <div className="bg-gray-900 text-white p-4">
-                  <h3 className="font-bold flex items-center gap-2">
-                    <Wallet className="w-5 h-5" /> Tổng cộng
-                  </h3>
-                </div>
-                <CardContent className="p-4 space-y-6">
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between text-gray-600">
-                      <span>Tạm tính:</span>
-                      <span>{formatPrice(displayTotal)}</span>
-                    </div>
-                    <div className="space-y-2 pt-2">
-
-                    </div>
-
-                    <div className="flex justify-between text-gray-600">
-                      <span>Vận chuyển:</span>
-                      <span className="text-green-600 font-medium">
-                        Miễn phí
-                      </span>
-                    </div>
-                    <Separator className="my-2" />
-                    <div className="flex justify-between items-end pt-1">
-                      <span className="font-bold text-base text-gray-900">
-                        Tổng thanh toán:
-                      </span>
-                      <span className="font-bold text-2xl text-red-600">
-                        {formatPrice(finalTotal)}
-                      </span>
-                    </div>
-                  </div>
-                  <Button
-                    type="submit"
-                    className="w-full h-12 text-base font-bold bg-red-600 hover:bg-red-700 shadow-sm mt-2"
-                    disabled={isSubmitting}
-                  >
-                    {isSubmitting ? "Đang xử lý..." : "Thanh toán ngay"}
-                  </Button>
-                </CardContent>
-              </Card>
-
-              <div className="bg-white p-3 rounded-lg shadow-sm border border-gray-100 flex gap-3 items-start">
-                <CheckCircle className="w-5 h-5 text-green-600 mt-0.5" />
-                <p className="text-xs text-gray-500 leading-relaxed">
-                  Cam kết bảo mật thanh toán. <br /> Hoàn tiền nếu có lỗi giao
-                  dịch.
-                </p>
-              </div>
-            </div>
-          </div>
-        </form>
-
-        <AddressSelectionDialog
-          open={openAddressDialog}
-          onOpenChange={setOpenAddressDialog}
-          onSelect={handleSelectAddress}
-          onAddNew={() => setOpenCreateAddress(true)}
-        />
-        {openCreateAddress && (
-          <CreateAddressModal
-            isOpen={openCreateAddress}
-            onClose={() => setOpenCreateAddress(false)}
-            initialData={null}
-            onSuccess={handleSuccessCreateAddr}
-          />
-        )}
-      </div>
-    </div>
-  );
+    // Xử lý luồng thanh toán dựa trên phương thức người dùng chọn
+    if (res.paymentMethod === "MOMO") {
+      const paymentRes = await createPayment(res._id);
+      if (!paymentRes?.ok) {
+        const errorMessage =
+          paymentRes && "message" in paymentRes
+            ? paymentRes.message
+            : "Không thể tạo thanh toán MoMo";
+        toast.error(errorMessage);
+        return;
+      }
+      const isMobile =
+        typeof navigator !== "undefined" &&
+        /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+      const paymentUrl = isMobile
+        ? paymentRes?.payment?.deeplink || paymentRes?.payment?.paymentUrl
+        : paymentRes?.payment?.paymentUrl || paymentRes?.payment?.deeplink;
+      const qrCodeUrl = paymentRes?.payment?.qrCodeUrl;
+      if (!paymentUrl) {
+        if (qrCodeUrl) {
+          toast.info(
+            "MoMo đang tạm lỗi, hệ thống chuyển sang thanh toán QR chuyển khoản.",
+          );
+          router.push(`/payment/transfer/${res._id}`);
+          return;
+        }
+        toast.error("Không tạo được link thanh toán MoMo");
+        return;
+      }
+      toast.success("Đang chuyển sang cổng thanh toán MoMo...");
+      window.location.href = paymentUrl;
+      return;
+    } else if (res.paymentMethod === "PAYOS") {
+      const paymentRes = await createPayment(res._id);
+      if (!paymentRes?.ok) {
+        const errorMessage =
+          paymentRes && "message" in paymentRes
+            ? paymentRes.message
+            : "Không thể tạo thanh toán";
+        toast.error(errorMessage);
+        return;
+      }
+      toast.success("Vui lòng quét mã QR để thanh toán.");
+      router.push(`/payment/transfer/${res._id}`);
+    } else if (res.paymentMethod === "COD") {
+      router.push(`/orders/${res._id}`);
+      toast.success("Đặt hàng thành công!");
+    }
+  } catch (error: any) {
+    console.error(error);
+    const message =
+      error?.response?.data?.message ||
+      error?.message ||
+      "Có lỗi xảy ra khi tạo đơn hàng";
+    toast.error(message);
+  }
 };
 
-const PaymentOption = ({
-  value,
-  label,
-  icon,
-  selected,
-}: {
-  value: string;
-  label: string;
-  icon: React.ReactNode;
-  selected: string;
-}) => (
-  <div
-    className={`relative flex items-center justify-between space-x-2 border p-3 rounded-lg cursor-pointer transition-all ${selected === value ? "border-blue-600 bg-blue-50 ring-1 ring-blue-600" : "border-gray-200 hover:border-gray-300"}`}
-  >
-    <div className="flex items-center space-x-3 w-full">
-      <RadioGroupItem value={value} id={value} />
-      <label
-        htmlFor={value}
-        className="cursor-pointer flex-1 flex items-center gap-2"
+if ((!cart && cartLoading) || addressLoading)
+  return <div className="text-center p-10">Loading...</div>;
+
+// If not authenticated, auth dialog will open globally via useEffect
+// No need to show anything here
+if (!user) {
+  return null;
+}
+
+if (!cart) return null;
+
+// Filter items to only show selected ones for checkout
+const displayItems =
+  checkoutItems && checkoutItems.length > 0
+    ? cart.items.filter((item) => checkoutItems.includes(item._id))
+    : cart.items;
+
+// Calculate total for displayed items only
+const displayTotal = displayItems.reduce(
+  (sum, item) => sum + item.price * item.quantity,
+  0,
+);
+const finalTotal = Math.max(0, displayTotal - discountAmount);
+
+const handleApplyCoupon = async () => {
+  const code = couponCode.trim();
+  if (!code) {
+    toast.error("Vui lòng nhập mã giảm giá");
+    return;
+  }
+
+  try {
+    setIsApplyingCoupon(true);
+    const response = await validateCoupon(code, displayTotal);
+    if (!response?.ok || !response?.coupon) {
+      toast.error("Mã giảm giá không hợp lệ");
+      return;
+    }
+
+    setAppliedCouponCode(response.coupon.code);
+    setDiscountAmount(response.coupon.discountAmount || 0);
+    toast.success(
+      `Áp mã thành công, giảm ${formatPrice(response.coupon.discountAmount || 0)}`,
+    );
+  } catch (error: any) {
+    const message =
+      error?.response?.data?.message || "Không áp dụng được mã giảm giá";
+    toast.error(message);
+    setAppliedCouponCode("");
+    setDiscountAmount(0);
+  } finally {
+    setIsApplyingCoupon(false);
+  }
+};
+
+const handleRemoveCoupon = () => {
+  setCouponCode("");
+  setAppliedCouponCode("");
+  setDiscountAmount(0);
+};
+
+return (
+  <div className="min-h-screen bg-gray-50/50 py-8 px-4 md:px-6">
+    <div className="max-w-6xl mx-auto">
+      {/* Header */}
+      <div className="flex items-center gap-2 mb-6">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setOpenCancel(true)}
+          className="rounded-full"
+        >
+          <ArrowLeft className="w-5 h-5" />
+        </Button>
+        <DialogCancelPayment
+          open={openCancel}
+          onOpenChange={setOpenCancel}
+          onConfirm={() => router.push("/")}
+        />
+        <h1 className="text-2xl font-bold text-gray-900">
+          Thanh toán đơn hàng
+        </h1>
+      </div>
+
+      <form
+        onSubmit={handleSubmit(onSubmit, (err) => console.log(err))}
+        className="grid grid-cols-1 lg:grid-cols-12 gap-8 relative"
       >
-        {icon}{" "}
-        <span className="font-medium text-gray-900 text-sm">{label}</span>
-      </label>
+        <div className="lg:col-span-8 space-y-6">
+          {/* 1. Address Section */}
+          <CheckoutAddressCard
+            receiverAddress={receiverAddress}
+            receiverName={receiverName}
+            receiverPhone={receiverPhone}
+            isDefaultAddress={isDefaultAddress}
+            errors={errors}
+            onOpenAddressDialog={() => setOpenAddressDialog(true)}
+          />
+
+          <OrderDetailsCard
+            displayItems={displayItems}
+            errorsDetails={errors.details}
+          />
+        </div>
+
+        {/* Right Column */}
+        <div className="lg:col-span-4">
+          <div className="sticky top-6 space-y-4">
+
+            {/* Payment Method */}
+            <PaymentMethodCard control={control} />
+
+            {/* Total, Coupon & Submit */}
+            <OrderSummaryCard
+              displayTotal={displayTotal}
+              finalTotal={finalTotal}
+              isSubmitting={isSubmitting}
+              couponCode={couponCode}
+              appliedCouponCode={appliedCouponCode}
+              discountAmount={discountAmount}
+              isApplyingCoupon={isApplyingCoupon}
+              setCouponCode={setCouponCode}
+              onApplyCoupon={handleApplyCoupon}
+              onRemoveCoupon={handleRemoveCoupon}
+            />
+
+          </div>
+        </div>
+      </form>
+
+      <AddressSelectionDialog
+        open={openAddressDialog}
+        onOpenChange={setOpenAddressDialog}
+        onSelect={handleSelectAddress}
+        onAddNew={() => setOpenCreateAddress(true)}
+      />
+      {openCreateAddress && (
+        <CreateAddressModal
+          isOpen={openCreateAddress}
+          onClose={() => setOpenCreateAddress(false)}
+          initialData={null}
+          onSuccess={handleSuccessCreateAddr}
+        />
+      )}
     </div>
   </div>
 );
+};
 
 export default OrderPage;

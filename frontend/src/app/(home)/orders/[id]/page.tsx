@@ -174,12 +174,17 @@ const OrderItemReviewAction = ({
 };
 
 export default function OrderOrderDetailPage() {
+  // useParams là hook của Next.js để lấy tham số động trên URL.
+  // Ví dụ: đường dẫn /orders/123 -> params.id sẽ là "123". Dấu hiệu của dynamic route là tên thư mục có dạng [id].
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
 
   const fetchCart = useCartStore((state) => state.fetchCart);
   const [isPaying, setIsPaying] = useState(false);
+
+  // useSWR tự động fetch dữ liệu chi tiết đơn hàng thông qua id.
+  // Đồng thời quản lý state loading, error và dữ liệu (order) trả về.
   const { data: order, isLoading: loading, error } = useSWR(
     id ? `/orders/${id}` : null,
     () => orderServices.getOrderDetailById(id),
@@ -195,6 +200,7 @@ export default function OrderOrderDetailPage() {
     }
   );
 
+  // Hàm xử lý thanh toán lại (nếu đơn hàng bị thanh toán lỗi, hoặc chưa thanh toán mà chọn MoMo/PayOS)
   const handleRepayment = async () => {
     if (!order) return;
     try {

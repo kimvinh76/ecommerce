@@ -18,6 +18,7 @@ import {
   LogOut,
   Flame,
   MessageSquare,
+  Ticket,
 } from "lucide-react";
 import { removeJWTfromCookie } from "@/lib/cookies";
 import { clearGuestSession } from "@/services/cartServices";
@@ -179,6 +180,16 @@ export default function Sidebar({ isOpen }: { isOpen: boolean }) {
           <Flame className={getIconClass("/admin/events")} />
           <span className={getTextClass("/admin/events")}>
             Sự kiện Giảm giá
+          </span>
+        </Link>
+
+        <Link
+          href="/admin/coupons"
+          className={getItemClass("/admin/coupons")}
+        >
+          <Ticket className={getIconClass("/admin/coupons")} />
+          <span className={getTextClass("/admin/coupons")}>
+            Mã giảm giá (Coupon)
           </span>
         </Link>
 
