@@ -2,8 +2,12 @@ import Supplier from '../models/Supplier.js';
 
 
 
-export async function getAllSuppliersService() {
-  return Supplier.find();
+export async function getAllSuppliersService(search = "") {
+  let query = {};
+  if (search) {
+    query.name = { $regex: search, $options: 'i' };
+  }
+  return Supplier.find(query);
 }
 
 

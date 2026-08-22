@@ -8,7 +8,8 @@ import {
 
 export async function getAllSuppliers(req, res) {
   try {
-    const suppliers = await getAllSuppliersService();
+    const search = req.query.search || "";
+    const suppliers = await getAllSuppliersService(search);
 
     res.status(200).json(suppliers);
   } catch (err) {

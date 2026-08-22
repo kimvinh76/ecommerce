@@ -12,7 +12,7 @@ export default function SuppliersPage() {
   const phoneRegex = /^0\d{9}$/;
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-  const { data: rawSuppliers = [], isLoading: loading, mutate: fetchSuppliers } = useSWR("/suppliers", supplierServices.getAllSuppliers);
+  const { data: rawSuppliers = [], isLoading: loading, mutate: fetchSuppliers } = useSWR("/suppliers", () => supplierServices.getAllSuppliers());
   const suppliers: Supplier[] = Array.isArray(rawSuppliers) ? rawSuppliers : (rawSuppliers as any).data || [];
 
   const [searchTerm, setSearchTerm] = useState<string>("");

@@ -2,8 +2,8 @@ import api from "@/lib/axios";
 import { Supplier } from "@/types/supplier.type"; // Assuming Supplier type exists, if not use any
 
 export const supplierServices = {
-  getAllSuppliers: async (): Promise<Supplier[]> => {
-      const response = await api.get('/suppliers');
+  getAllSuppliers: async (search: string = ""): Promise<Supplier[]> => {
+      const response = await api.get('/suppliers', { params: { search } });
       return response.data;
   },
   getSupplierById: async (id: string): Promise<Supplier> => {
