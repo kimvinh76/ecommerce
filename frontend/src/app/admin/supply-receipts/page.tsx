@@ -1,7 +1,7 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import useSWR from "swr";
-import { Plus, Pencil, Trash2, Loader2, RefreshCw, Eye } from "lucide-react";
+import { Plus, Pencil, Trash2, Loader2, RefreshCw, Eye, Search } from "lucide-react";
 import Swal from "sweetalert2";
 import { supplyReceiptServices } from "@/services/supplyReceiptServices";
 import { supplierServices } from "@/services/supplierServices";
@@ -16,6 +16,8 @@ export default function SupplyReceiptsPage() {
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [itemsPerPage, setItemsPerPage] = useState<number>(5);
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [searchTerm, setSearchTerm] = useState<string>("");
+  const [debouncedSearch, setDebouncedSearch] = useState<string>("");
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<SupplyReceipt | null>(null);
 
@@ -28,12 +30,21 @@ export default function SupplyReceiptsPage() {
   const books: Book[] = (rawBooks as any).data || rawBooks || [];
   const mappedBooks = books.map((b: any) => ({ id: b._id || b.id, name: b.name, price: b.price }));
 
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+      setCurrentPage(1); // Reset về trang đầu khi tìm kiếm
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
   const fetchParams: any = { page: currentPage, limit: itemsPerPage };
   if (statusFilter !== "all") fetchParams.status = statusFilter;
+  if (debouncedSearch) fetchParams.search = debouncedSearch;
   
   const { data: receiptsResponse, mutate: fetchReceipts, isLoading: loading } = useSWR(
     ["/supply-receipts", fetchParams],
-    () => supplyReceiptServices.getAllSupplyReceipts(fetchParams.page, fetchParams.limit, fetchParams.status)
+    () => supplyReceiptServices.getAllSupplyReceipts(fetchParams.page, fetchParams.limit, fetchParams.status, fetchParams.search)
   );
 
   const { data: allReceiptsResponse } = useSWR(
@@ -333,6 +344,16 @@ export default function SupplyReceiptsPage() {
             <Plus className="w-4 h-4" /> Thêm phiếu nhập
           </button>
         </div>
+        <div className="mt-4 flex items-center bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 w-full md:w-1/2 lg:w-1/3 transition-all focus-within:ring-2 focus-within:ring-teal-200 focus-within:border-teal-400">
+          <Search className="text-gray-400 w-5 h-5 mr-2" />
+          <input
+            type="text"
+            placeholder="Tìm theo ID phiếu nhập hoặc tên nhà cung cấp..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="bg-transparent border-none outline-none text-sm w-full text-gray-700 placeholder-gray-400"
+          />
+        </div>
       </div>
 
       {/* FILTER TABS */}
@@ -413,7 +434,7 @@ export default function SupplyReceiptsPage() {
                     const supplierName = (r as any).supplier_name || mappedSuppliers.find((s: any) => s.id === r.supplier_id)?.name || "Không rõ";
                     return (
                       <tr key={r.id} className="border-t border-gray-200 hover:bg-gray-50 transition-all duration-200">
-                        <td className="px-4 py-4 text-gray-800 font-medium">{r.id.slice(-8)}</td>
+                        <td className="px-4 py-4 text-gray-800 font-medium whitespace-nowrap">{r.id}</td>
                         <td className="px-4 py-4 text-gray-600">{supplierName}</td>
                         <td className="px-4 py-4 text-gray-600">
                           {new Date(r.supply_date).toLocaleDateString("vi-VN")}

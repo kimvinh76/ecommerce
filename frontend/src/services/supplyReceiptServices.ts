@@ -25,12 +25,16 @@ export const supplyReceiptServices = {
   getAllSupplyReceipts: async (
     page: number = 1,
     limit: number = 10,
-    status?: string
+    status?: string,
+    search?: string
   ): Promise<ApiResponse<SupplyReceipt[]>> => {
     try {
       const params: Record<string, any> = { page, limit };
       if (status && status !== "all") {
         params.status = status;
+      }
+      if (search) {
+        params.search = search;
       }
 
       const response = await api.get<ApiResponse<SupplyReceipt[]>>(

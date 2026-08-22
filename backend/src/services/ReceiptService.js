@@ -2,6 +2,70 @@ import Order from '../models/Order.js';
 import Book from '../models/Book.js';
 import SupplyReceipt from '../models/SupplyReceipt.js';
 import SupplyDetail from '../models/SupplyDetail.js';
+import Supplier from '../models/Supplier.js';
+
+// Lấy tất cả phiếu nhập hàng (có phân trang, lọc, tìm kiếm)
+export async function getAllSupplyReceiptsService(page = 1, limit = 10, status = '', search = '') {
+  const query = {};
+    
+  if (status) {
+    query.purchaseStatus = status;
+  }
+
+  if (search) {
+    const searchConditions = [];
+    
+    // 1. Tìm nhà cung cấp theo tên
+    const matchedSuppliers = await Supplier.find({ name: { $regex: search, $options: 'i' } }).select('_id');
+    if (matchedSuppliers.length > 0) {
+      searchConditions.push({ supplierId: { $in: matchedSuppliers.map(s => s._id) } });
+    }
+    
+    // 2. Tìm theo mã phiếu nhập (nếu là ObjectId hợp lệ)
+    if (/^[0-9a-fA-F]{24}$/.test(search)) {
+      searchConditions.push({ _id: search });
+    }
+
+    if (searchConditions.length > 0) {
+      query.$or = searchConditions;
+    } else {
+      // Không khớp gì thì không trả về
+      query._id = null;
+    }
+  }
+
+  const receipts = await SupplyReceipt.find(query)
+    .populate('adminId', 'fullName email')
+    .populate('supplierId', 'name phone email address')
+    .sort({ createdAt: -1 })
+    .skip((page - 1) * limit)
+    .limit(parseInt(limit))
+    .lean();
+
+  // Lấy details cho mỗi receipt
+  const receiptsWithDetails = await Promise.all(
+    receipts.map(async (receipt) => {
+      const details = await SupplyDetail.find({ receiptId: receipt._id })
+        .populate({
+          path: 'bookId',
+          select: 'name price imageUrl isDeleted'
+        });
+      return { ...receipt, details };
+    })
+  );
+
+  const total = await SupplyReceipt.countDocuments(query);
+
+  return {
+    data: receiptsWithDetails,
+    pagination: {
+      page: parseInt(page),
+      limit: parseInt(limit),
+      total,
+      totalPages: Math.ceil(total / limit)
+    }
+  };
+}
 
 // Tao phieu nhap + chi tiet, tinh tong tien tu chi tiet
 export async function createSupplyReceiptService(adminId, supplierId, details) {
