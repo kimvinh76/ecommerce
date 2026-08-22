@@ -25,10 +25,10 @@ export async function createEventService(eventData) {
     };
 
     // Neu ap dung theo san pham/nhom, chi gan dung danh sach id
-    if (applyType === 'products' && bookIds && Array.isArray(bookIds)) {
-      eventPayload.bookIds = bookIds;
-    } else if (applyType === 'categories' && categoryIds && Array.isArray(categoryIds)) {
-      eventPayload.categoryIds = categoryIds;
+    if (applyType === 'products' && bookIds) {
+      eventPayload.bookIds = Array.isArray(bookIds) ? bookIds : [bookIds];
+    } else if (applyType === 'categories' && categoryIds) {
+      eventPayload.categoryIds = Array.isArray(categoryIds) ? categoryIds : [categoryIds];
     }
 
     const newEvent = await Event.create(eventPayload);
@@ -44,15 +44,26 @@ export async function getAllEventsService(query = {}) {
   try {
     const page = parseInt(query.page) || 1;
     const limit = parseInt(query.limit) || 10;
+    const search = query.search || "";
     const skip = (page - 1) * limit;
 
-    const events = await Event.find()
+    let filter = {};
+    if (search) {
+      filter = {
+        $or: [
+          { name: { $regex: search, $options: 'i' } },
+          { description: { $regex: search, $options: 'i' } }
+        ]
+      };
+    }
+
+    const events = await Event.find(filter)
       .skip(skip)
       .limit(limit)
       .sort({ createdAt: -1 })
       .lean();
 
-    const total = await Event.countDocuments();
+    const total = await Event.countDocuments(filter);
 
     return {
       events,
@@ -99,10 +110,10 @@ export async function updateEventService(eventId, eventData) {
       updatePayload.bookIds = [];
       updatePayload.categoryIds = [];
       
-      if (applyType === 'products' && bookIds && Array.isArray(bookIds)) {
-        updatePayload.bookIds = bookIds;
-      } else if (applyType === 'categories' && categoryIds && Array.isArray(categoryIds)) {
-        updatePayload.categoryIds = categoryIds;
+      if (applyType === 'products' && bookIds) {
+        updatePayload.bookIds = Array.isArray(bookIds) ? bookIds : [bookIds];
+      } else if (applyType === 'categories' && categoryIds) {
+        updatePayload.categoryIds = Array.isArray(categoryIds) ? categoryIds : [categoryIds];
       }
     }
 
