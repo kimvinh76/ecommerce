@@ -25,6 +25,7 @@ export const supplyReceiptServices = {
   getAllSupplyReceipts: async (
     page: number = 1,
     limit: number = 10,
+    
     status?: string,
     search?: string
   ): Promise<ApiResponse<SupplyReceipt[]>> => {
