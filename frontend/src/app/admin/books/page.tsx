@@ -1,5 +1,6 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import useSWR from "swr";
 import Image from "next/image";
 import { Plus, Pencil, Trash2, Search, Upload, Eye, X } from "lucide-react";
 import Pagination from "../components/Pagination";
@@ -8,12 +9,12 @@ import type { Book, BooksResponse } from "@/types/book.type";
 import type { Author } from "@/types/author.type";
 import type { Category } from "@/types/category.type";
 import type { Publisher } from "@/types/publisher.type";
-import axios from "axios";
-import { baseUrl } from "@/constants/index";
-import { createBook, updateBook, deleteBook } from "@/api/bookApi";
+import { bookServices } from "@/services/bookServices";
+import { authorServices } from "@/services/authorServices";
+import { categoryServices } from "@/services/categoryServices";
+import { publisherServices } from "@/services/publisherServices";
 import Swal from "sweetalert2";
 import toast from "react-hot-toast";
-import api from '@/lib/axios';
 
 // Hàm tạo slug từ tên sách
 const generateSlug = (name: string): string => {
@@ -29,19 +30,28 @@ const generateSlug = (name: string): string => {
 };
 
 export default function BooksPage() {
-  const [books, setBooks] = useState<Book[]>([]);
-  const [authors, setAuthors] = useState<Author[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [publishers, setPublishers] = useState<Publisher[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
   const [pagination, setPagination] = useState({
-    totalItems: 0,
-    totalPages: 0,
     currentPage: 1,
     limit: 12,
   });
   const [currentPageClient, setCurrentPageClient] = useState<number>(1);
   const [itemsPerPage, setItemsPerPage] = useState<number>(10);
+
+  const { data: rawAuthors = [] } = useSWR("/authors", () => authorServices.getAllAuthors());
+  const authors: Author[] = Array.isArray(rawAuthors) ? rawAuthors : (rawAuthors as any).data || [];
+
+  const { data: rawCategories = [] } = useSWR("/categories", () => categoryServices.getAllCategories());
+  const categories: Category[] = Array.isArray(rawCategories) ? rawCategories : (rawCategories as any).data || [];
+
+  const { data: rawPublishers = [] } = useSWR("/publishers", () => publisherServices.getAllPublishers());
+  const publishers: Publisher[] = Array.isArray(rawPublishers) ? rawPublishers : (rawPublishers as any).data || [];
+
+  const { data: booksResponse, mutate: fetchBooks, isLoading: loading } = useSWR(
+    ["/books", pagination.currentPage, pagination.limit],
+    () => bookServices.getAllBooks({ page: pagination.currentPage, limit: pagination.limit })
+  );
+
+  const books: Book[] = booksResponse?.data || [];
 
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
@@ -70,58 +80,7 @@ export default function BooksPage() {
     price: 0
   });
 
-  // Fetch data from API
-  useEffect(() => {
-    fetchBooks();
-    fetchAuthors();
-    fetchCategories();
-    fetchPublishers();
-  }, [pagination.currentPage, pagination.limit]);
 
-  const fetchBooks = async () => {
-    try {
-      setLoading(true);
-      const response = await axios.get<BooksResponse>(`${baseUrl}/books`, {
-        params: {
-          page: pagination.currentPage,
-          limit: pagination.limit,
-        }
-      });
-      setBooks(response.data.data);
-      setPagination(response.data.pagination);
-    } catch (error) {
-      console.error("Error fetching books:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchAuthors = async () => {
-    try {
-      const response = await api.get(`${baseUrl}/authors`);
-      setAuthors(response.data);
-    } catch (error) {
-      console.error("Error fetching authors:", error);
-    }
-  };
-
-  const fetchCategories = async () => {
-    try {
-      const response = await api.get(`${baseUrl}/categories`);
-      setCategories(response.data);
-    } catch (error) {
-      console.error("Error fetching categories:", error);
-    }
-  };
-
-  const fetchPublishers = async () => {
-    try {
-      const response = await axios.get(`${baseUrl}/publishers`);
-      setPublishers(response.data);
-    } catch (error) {
-      console.error("Error fetching publishers:", error);
-    }
-  };
 
   // Lọc danh sách sách (client-side filtering)
   const filteredBooks = books.filter(book => {
@@ -216,7 +175,7 @@ export default function BooksPage() {
       }
 
       if (editingBook) {
-        const response = await updateBook(editingBook._id, submitData);
+        const response = await bookServices.updateBook(editingBook._id, submitData);
         console.log('Update response:', response);
         Swal.fire({
           icon: 'success',
@@ -234,7 +193,7 @@ export default function BooksPage() {
           });
           return;
         }
-        await createBook(submitData);
+        await bookServices.createBook(submitData);
         Swal.fire({
           icon: 'success',
           title: 'Thành công',
@@ -273,7 +232,7 @@ export default function BooksPage() {
 
     if (result.isConfirmed) {
       try {
-        await deleteBook(id);
+        await bookServices.deleteBook(id);
         toast.success('Xóa sách thành công!', {
           position: 'bottom-right',
           duration: 3000,

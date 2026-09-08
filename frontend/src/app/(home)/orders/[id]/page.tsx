@@ -174,33 +174,33 @@ const OrderItemReviewAction = ({
 };
 
 export default function OrderOrderDetailPage() {
+  // useParams là hook của Next.js để lấy tham số động trên URL.
+  // Ví dụ: đường dẫn /orders/123 -> params.id sẽ là "123". Dấu hiệu của dynamic route là tên thư mục có dạng [id].
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
 
-  const [order, setOrder] = useState<OrderWithDetails | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [isPaying, setIsPaying] = useState(false);
   const fetchCart = useCartStore((state) => state.fetchCart);
+  const [isPaying, setIsPaying] = useState(false);
 
-  useEffect(() => {
-    const fetchOrder = async () => {
-      try {
-        const res = await orderServices.getOrderDetailById(id);
-        setOrder(res);
-        // Refresh cart state (backend already removed ordered items)
-        await fetchCart();
-      } catch (error) {
-        console.error("Lỗi tải đơn hàng:", error);
+  // useSWR tự động fetch dữ liệu chi tiết đơn hàng thông qua id.
+  // Đồng thời quản lý state loading, error và dữ liệu (order) trả về.
+  const { data: order, isLoading: loading, error } = useSWR(
+    id ? `/orders/${id}` : null,
+    () => orderServices.getOrderDetailById(id),
+    {
+      onSuccess: () => {
+        // Refresh cart state
+        fetchCart();
+      },
+      onError: (err) => {
+        console.error("Lỗi tải đơn hàng:", err);
         toast.error("Không tìm thấy đơn hàng");
-      } finally {
-        setLoading(false);
       }
-    };
+    }
+  );
 
-    if (id) fetchOrder();
-  }, [id]);
-
+  // Hàm xử lý thanh toán lại (nếu đơn hàng bị thanh toán lỗi, hoặc chưa thanh toán mà chọn MoMo/PayOS)
   const handleRepayment = async () => {
     if (!order) return;
     try {

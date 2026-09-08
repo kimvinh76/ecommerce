@@ -19,11 +19,12 @@ export interface EventListResponse {
 
 export async function getAllEventsApi(
   page: number = 1,
-  limit: number = 10
+  limit: number = 10,
+  search: string = ""
 ): Promise<EventListResponse> {
   try {
     const response = await api.get(`/events`, {
-      params: { page, limit },
+      params: { page, limit, search },
     });
 
     const payload: EventListPayload = response.data?.data || {};
@@ -64,6 +65,9 @@ export async function createEventApi(data: {
   discountPercent: number;
   startDate: string;
   endDate: string;
+  applyType: string;
+  bookIds?: string[];
+  categoryIds?: string[];
 }) {
   try {
     const response = await api.post(`/events`, data);

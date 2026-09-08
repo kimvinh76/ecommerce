@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
-import { Plus, Edit2, Trash2, Check, X, Calendar } from "lucide-react";
+import useSWR from "swr";
+import { Plus, Edit2, Trash2, Check, X, Calendar, Search } from "lucide-react";
 import Swal from "sweetalert2";
 import toast from "react-hot-toast";
 import {
@@ -31,14 +32,31 @@ interface Event {
 }
 
 export default function EventsPage() {
-  const [events, setEvents] = useState<Event[]>([]);
-  const [loading, setLoading] = useState(true);
   const [pagination, setPagination] = useState({
     currentPage: 1,
-    totalPages: 1,
-    totalItems: 0,
     limit: 10,
   });
+  
+  const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+      setPagination(prev => ({ ...prev, currentPage: 1 }));
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  const { data: eventsData, mutate: fetchEvents, isLoading: loading } = useSWR(
+    ["/events", pagination.currentPage, pagination.limit, debouncedSearch],
+    () => getAllEventsApi(pagination.currentPage, pagination.limit, debouncedSearch)
+  );
+  
+  const events: Event[] = eventsData?.events || [];
+  const totalPages = Math.max(1, eventsData?.totalPages || 1);
+  const totalItems = eventsData?.totalItems || 0;
+
   const [showModal, setShowModal] = useState(false);
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const [books, setBooks] = useState<Book[]>([]);
@@ -64,10 +82,6 @@ export default function EventsPage() {
   }, []);
 
   useEffect(() => {
-    fetchEvents();
-  }, [pagination.currentPage, pagination.limit]);
-
-  useEffect(() => {
     if (formError) {
       setFormError(null);
     }
@@ -75,28 +89,6 @@ export default function EventsPage() {
       setFormErrors({});
     }
   }, [formData]);
-
-  const fetchEvents = async () => {
-    try {
-      setLoading(true);
-      const result = await getAllEventsApi(
-        pagination.currentPage,
-        pagination.limit
-      );
-      setEvents(result.events as Event[]);
-      setPagination((prev) => ({
-        ...prev,
-        totalItems: result.totalItems,
-        totalPages: Math.max(1, result.totalPages),
-        currentPage: result.currentPage,
-      }));
-    } catch (error) {
-      toast.error("Lỗi tải sự kiện");
-      console.error(error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const fetchBooks = async () => {
     try {
@@ -310,18 +302,9 @@ export default function EventsPage() {
 
     try {
       setStatusUpdatingId(eventId);
-      const updated = await updateEventStatusApi(eventId, nextStatus);
+      await updateEventStatusApi(eventId, nextStatus);
 
-      setEvents((prev) =>
-        prev.map((event) =>
-          event._id === eventId
-            ? {
-                ...event,
-                status: (updated?.status as EventStatus) || nextStatus,
-              }
-            : event
-        )
-      );
+      fetchEvents();
 
       toast.success("Cập nhật trạng thái thành công");
     } catch (error: any) {
@@ -354,6 +337,17 @@ export default function EventsPage() {
           >
             <Plus className="w-4 h-4" /> Thêm sự kiện
           </button>
+        </div>
+        
+        <div className="mt-4 flex items-center bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 w-full md:w-1/3 transition-all focus-within:ring-2 focus-within:ring-purple-200 focus-within:border-purple-400">
+          <Search className="text-gray-400 w-5 h-5 mr-2" />
+          <input
+            type="text"
+            placeholder="Tìm kiếm sự kiện (theo tên hoặc mô tả)..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="bg-transparent border-none outline-none text-sm w-full text-gray-700 placeholder-gray-400"
+          />
         </div>
       </div>
 
@@ -507,8 +501,8 @@ export default function EventsPage() {
             <div className="px-6 pb-6">
               <Pagination
                 currentPage={pagination.currentPage}
-                totalPages={pagination.totalPages}
-                totalItems={pagination.totalItems}
+                totalPages={totalPages}
+                totalItems={totalItems}
                 itemsPerPage={pagination.limit}
                 onPageChange={(page) =>
                   setPagination((prev) => ({ ...prev, currentPage: page }))

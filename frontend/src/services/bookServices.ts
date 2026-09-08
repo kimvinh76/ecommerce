@@ -71,6 +71,53 @@ export const bookServices = {
       throw error;
     }
   },
+  getAllBooks: async (params: any = {}): Promise<any> => {
+    try {
+      const response = await api.get('/books', { params });
+      return response.data;
+    } catch (error) {
+      console.error(error);
+      throw error;
+    }
+  },
+
+  createBook: async (formData: FormData): Promise<any> => {
+    try {
+      const response = await api.post('/books', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      return response.data;
+    } catch (error) {
+      console.error(error);
+      throw error;
+    }
+  },
+
+  updateBook: async (id: string, formData: FormData): Promise<any> => {
+    try {
+      const response = await api.put(`/books/${id}`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      return response.data;
+    } catch (error) {
+      console.error(error);
+      throw error;
+    }
+  },
+
+  deleteBook: async (id: string): Promise<any> => {
+    try {
+      const response = await api.delete(`/books/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error(error);
+      throw error;
+    }
+  },
 };
 
 

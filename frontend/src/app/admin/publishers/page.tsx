@@ -1,39 +1,24 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import useSWR from "swr";
 import { Plus, Pencil, Trash2, Search } from "lucide-react";
 import Swal from "sweetalert2";
 import toast from "react-hot-toast";
 import type { Publisher } from "@/types/publisher.type";
 import Pagination from "../components/Pagination";
-import { getAllPublishers, createPublisher, updatePublisher, deletePublisher } from "@/api/publisherApi";
+import { publisherServices } from "@/services/publisherServices";
 
 export default function PublishersPage() {
-  const [publishers, setPublishers] = useState<Publisher[]>([]);
+  const { data: rawPublishers = [], isLoading: loading, mutate: fetchPublishers } = useSWR("/publishers", publisherServices.getAllPublishers);
+  
+  const publishers: Publisher[] = Array.isArray(rawPublishers) ? rawPublishers : (rawPublishers as any).data || [];
+
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [showModal, setShowModal] = useState<boolean>(false);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [itemsPerPage, setItemsPerPage] = useState<number>(10);
   const [editingPublisher, setEditingPublisher] = useState<Publisher | null>(null);
   const [formData, setFormData] = useState<{ name: string }>({ name: "" });
-  const [loading, setLoading] = useState<boolean>(true);
-
-  // Fetch publishers from API
-  useEffect(() => {
-    fetchPublishers();
-  }, []);
-
-  const fetchPublishers = async () => {
-    try {
-      setLoading(true);
-      const data = await getAllPublishers();
-      setPublishers(data);
-    } catch (error) {
-      console.error("Error fetching publishers:", error);
-      alert("Lỗi khi tải danh sách nhà xuất bản!");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   // Lọc theo tên
   const filteredPublishers = publishers.filter((pub) =>
@@ -79,7 +64,7 @@ export default function PublishersPage() {
 
     try {
       if (editingPublisher) {
-        await updatePublisher(editingPublisher._id, { name: formData.name.trim() });
+        await publisherServices.updatePublisher(editingPublisher._id, { name: formData.name.trim() });
         Swal.fire({
           icon: 'success',
           title: 'Thành công',
@@ -88,7 +73,7 @@ export default function PublishersPage() {
           showConfirmButton: false,
         });
       } else {
-        await createPublisher({ name: formData.name.trim() });
+        await publisherServices.createPublisher({ name: formData.name.trim() });
         Swal.fire({
           icon: 'success',
           title: 'Thành công',
@@ -125,7 +110,7 @@ export default function PublishersPage() {
 
     if (result.isConfirmed) {
       try {
-        await deletePublisher(id);
+        await publisherServices.deletePublisher(id);
         toast.success('Xóa nhà xuất bản thành công!', {
           position: 'bottom-right',
           duration: 3000,

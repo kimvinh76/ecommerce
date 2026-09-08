@@ -25,12 +25,17 @@ export const supplyReceiptServices = {
   getAllSupplyReceipts: async (
     page: number = 1,
     limit: number = 10,
-    status?: string
+    
+    status?: string,
+    search?: string
   ): Promise<ApiResponse<SupplyReceipt[]>> => {
     try {
       const params: Record<string, any> = { page, limit };
       if (status && status !== "all") {
         params.status = status;
+      }
+      if (search) {
+        params.search = search;
       }
 
       const response = await api.get<ApiResponse<SupplyReceipt[]>>(
@@ -84,6 +89,30 @@ export const supplyReceiptServices = {
       return response.data;
     } catch (error) {
       console.error("Error updating supply receipt:", error);
+      throw error;
+    }
+  },
+  // Update supply receipt status only
+  updateSupplyReceiptStatus: async (id: string, purchaseStatus: string): Promise<ApiResponse<SupplyReceipt>> => {
+    try {
+      const response = await api.patch<ApiResponse<SupplyReceipt>>(
+        `/supply-receipts/${id}/status`,
+        { purchaseStatus }
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error updating supply receipt status:", error);
+      throw error;
+    }
+  },
+
+  // Get supply receipt statistics
+  getSupplyReceiptStats: async (): Promise<any> => {
+    try {
+      const response = await api.get('/supply-receipts/stats');
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching supply receipt stats:", error);
       throw error;
     }
   },

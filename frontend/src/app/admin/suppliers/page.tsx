@@ -1,23 +1,25 @@
 "use client";
 import { useState, useEffect } from "react";
+import useSWR from "swr";
 import { Plus, Pencil, Trash2, Search } from "lucide-react";
 import Swal from "sweetalert2";
 import toast from "react-hot-toast";
 import type { Supplier } from "@/types/supplier.type";
 import Pagination from "../components/Pagination";
-import { getAllSuppliers, createSupplier, updateSupplier, deleteSupplier } from "@/api/supplierApi";
+import { supplierServices } from "@/services/supplierServices";
 
 export default function SuppliersPage() {
   const phoneRegex = /^0\d{9}$/;
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const { data: rawSuppliers = [], isLoading: loading, mutate: fetchSuppliers } = useSWR("/suppliers", () => supplierServices.getAllSuppliers());
+  const suppliers: Supplier[] = Array.isArray(rawSuppliers) ? rawSuppliers : (rawSuppliers as any).data || [];
+
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [showModal, setShowModal] = useState<boolean>(false);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [itemsPerPage, setItemsPerPage] = useState<number>(10);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
   const [formErrors, setFormErrors] = useState<Partial<Record<keyof Omit<Supplier, "_id">, string>>>({});
   const [formData, setFormData] = useState<Omit<Supplier, "_id">>({
     name: "",
@@ -26,29 +28,11 @@ export default function SuppliersPage() {
     address: "",
   });
 
-  // Fetch suppliers from API
-  useEffect(() => {
-    fetchSuppliers();
-  }, []);
-
   useEffect(() => {
     if (Object.keys(formErrors).length > 0) {
       setFormErrors({});
     }
   }, [formData]);
-
-  const fetchSuppliers = async () => {
-    try {
-      setLoading(true);
-      const data = await getAllSuppliers();
-      setSuppliers(data);
-    } catch (error) {
-      console.error('Error fetching suppliers:', error);
-      alert('Không thể tải danh sách nhà cung cấp');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   // Lọc theo tên hoặc số điện thoại
   const filteredSuppliers = suppliers.filter(
@@ -135,7 +119,7 @@ export default function SuppliersPage() {
 
     try {
       if (editingSupplier) {
-        await updateSupplier(editingSupplier._id, sanitizedData);
+        await supplierServices.updateSupplier(editingSupplier._id, sanitizedData);
         Swal.fire({
           icon: 'success',
           title: 'Thành công',
@@ -144,7 +128,7 @@ export default function SuppliersPage() {
           showConfirmButton: false,
         });
       } else {
-        await createSupplier(sanitizedData);
+        await supplierServices.createSupplier(sanitizedData);
         Swal.fire({
           icon: 'success',
           title: 'Thành công',
@@ -181,7 +165,7 @@ export default function SuppliersPage() {
 
     if (result.isConfirmed) {
       try {
-        await deleteSupplier(id);
+        await supplierServices.deleteSupplier(id);
         toast.success('Xóa nhà cung cấp thành công!', {
           position: 'bottom-right',
           duration: 3000,

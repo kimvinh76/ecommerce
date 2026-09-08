@@ -1,52 +1,21 @@
 import {
+  getAllSupplyReceiptsService,
   createSupplyReceiptService,
   updateSupplyReceiptService,
   updatePurchaseStatusService
 } from '../services/ReceiptService.js';
 import SupplyReceipt from '../models/SupplyReceipt.js';
 import SupplyDetail from '../models/SupplyDetail.js';
+import Supplier from '../models/Supplier.js';
 
 // Lấy tất cả phiếu nhập hàng
 export async function getAllSupplyReceipts(req, res) {
   try {
-    const { page = 1, limit = 10, status } = req.query;
-    const query = {};
+    const { page = 1, limit = 10, status, search } = req.query;
     
-    if (status) {
-      query.purchaseStatus = status;
-    }
+    const result = await getAllSupplyReceiptsService(page, limit, status, search);
 
-    const receipts = await SupplyReceipt.find(query)
-      .populate('adminId', 'fullName email')
-      .populate('supplierId', 'name phone email address')
-      .sort({ createdAt: -1 })
-      .skip((page - 1) * limit)
-      .limit(parseInt(limit))
-      .lean();
-
-    // Lấy details cho mỗi receipt
-    const receiptsWithDetails = await Promise.all(
-      receipts.map(async (receipt) => {
-        const details = await SupplyDetail.find({ receiptId: receipt._id })
-          .populate({
-            path: 'bookId',
-            select: 'name price imageUrl isDeleted'
-          });
-        return { ...receipt, details };
-      })
-    );
-
-    const total = await SupplyReceipt.countDocuments(query);
-
-    res.status(200).json({
-      data: receiptsWithDetails,
-      pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total,
-        totalPages: Math.ceil(total / limit)
-      }
-    });
+    res.status(200).json(result);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

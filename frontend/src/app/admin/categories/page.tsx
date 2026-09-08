@@ -1,39 +1,31 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import useSWR from "swr";
 import { Plus, Pencil, Trash2, Search } from "lucide-react";
 import Swal from "sweetalert2";
 import toast from "react-hot-toast";
 import type { Category } from "@/types/category.type";
 import Pagination from "../components/Pagination";
-import { getAllCategories, createCategory, updateCategory, deleteCategory } from "@/api/categoryApi";
+import { categoryServices } from "@/services/categoryServices";
 
 export default function CategoriesPage() {
-  const [categories, setCategories] = useState<Category[]>([]);
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [showModal, setShowModal] = useState<boolean>(false);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [itemsPerPage, setItemsPerPage] = useState<number>(10);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [formData, setFormData] = useState<{ name: string }>({ name: "" });
-  const [loading, setLoading] = useState<boolean>(true);
 
-  // Fetch categories from API
-  useEffect(() => {
-    fetchCategories();
-  }, []);
+  const {
+    data: categories = [],
+    error,
+    isLoading: loading,
+    mutate: fetchCategories,
+  } = useSWR("/categories", categoryServices.getAllCategories);
 
-  const fetchCategories = async () => {
-    try {
-      setLoading(true);
-      const data = await getAllCategories();
-      setCategories(data);
-    } catch (error) {
-      console.error("Error fetching categories:", error);
-      alert("Lỗi khi tải danh sách danh mục!");
-    } finally {
-      setLoading(false);
-    }
-  };
+  if (error) {
+    console.error("Error fetching categories:", error);
+  }
 
   const filteredCategories = categories.filter((cat) =>
     cat.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -76,7 +68,7 @@ export default function CategoriesPage() {
     try {
       const slug = formData.name.trim().toLowerCase().replace(/\s+/g, "-");
       if (editingCategory) {
-        await updateCategory(editingCategory._id, { name: formData.name.trim(), slug });
+        await categoryServices.updateCategory(editingCategory._id, { name: formData.name.trim(), slug });
         Swal.fire({
           icon: 'success',
           title: 'Thành công',
@@ -85,7 +77,7 @@ export default function CategoriesPage() {
           showConfirmButton: false,
         });
       } else {
-        await createCategory({ name: formData.name.trim(), slug });
+        await categoryServices.createCategory({ name: formData.name.trim(), slug });
         Swal.fire({
           icon: 'success',
           title: 'Thành công',
@@ -121,7 +113,7 @@ export default function CategoriesPage() {
 
     if (result.isConfirmed) {
       try {
-        await deleteCategory(id);
+        await categoryServices.deleteCategory(id);
         toast.success('Xóa danh mục thành công!', {
           position: 'bottom-right',
           duration: 3000,

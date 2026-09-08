@@ -4,36 +4,30 @@ import { Plus, Pencil, Trash2, Search } from "lucide-react";
 import Swal from "sweetalert2";
 import type { Author } from "@/types/author.type";
 import Pagination from "../components/Pagination";
-import { getAllAuthors, createAuthor, updateAuthor, deleteAuthor } from "@/api/authorApi";
+import { authorServices } from "@/services/authorServices";
+import useSWR from "swr";
 import { toast } from 'sonner';
 
 export default function AuthorsPage() {
-  const [authors, setAuthors] = useState<Author[]>([]);
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [showModal, setShowModal] = useState<boolean>(false);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [itemsPerPage, setItemsPerPage] = useState<number>(10);
   const [editingAuthor, setEditingAuthor] = useState<Author | null>(null);
   const [formData, setFormData] = useState<{ name: string }>({ name: "" });
-  const [loading, setLoading] = useState<boolean>(true);
 
-  // Fetch authors from API
-  useEffect(() => {
-    fetchAuthors();
-  }, []);
+  const {
+    data: rawAuthors = [],
+    error,
+    isLoading: loading,
+    mutate: fetchAuthors,
+  } = useSWR("/authors", authorServices.getAllAuthors);
 
-  const fetchAuthors = async () => {
-    try {
-      setLoading(true);
-      const data = await getAllAuthors();
-      setAuthors(data);
-    } catch (error) {
-      console.error("Error fetching authors:", error);
-      alert("Lỗi khi tải danh sách tác giả!");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const authors: Author[] = Array.isArray(rawAuthors) ? rawAuthors : (rawAuthors as any).data || [];
+
+  if (error) {
+    console.error("Error fetching authors:", error);
+  }
 
   const filteredAuthors = authors.filter((a) =>
     a.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -75,7 +69,7 @@ export default function AuthorsPage() {
 
     try {
       if (editingAuthor) {
-        await updateAuthor(editingAuthor._id, { name: formData.name.trim() });
+        await authorServices.updateAuthor(editingAuthor._id, { name: formData.name.trim() });
         Swal.fire({
           icon: 'success',
           title: 'Thành công',
@@ -84,7 +78,7 @@ export default function AuthorsPage() {
           showConfirmButton: false,
         });
       } else {
-        await createAuthor({ name: formData.name.trim() });
+        await authorServices.createAuthor({ name: formData.name.trim() });
         Swal.fire({
           icon: 'success',
           title: 'Thành công',
@@ -120,7 +114,7 @@ export default function AuthorsPage() {
 
     if (result.isConfirmed) {
       try {
-        await deleteAuthor(id);
+        await authorServices.deleteAuthor(id);
         toast.success('Xóa tác giả thành công!', {
           position: 'bottom-right',
           duration: 3000,

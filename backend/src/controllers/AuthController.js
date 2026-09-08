@@ -33,7 +33,7 @@ export const loginUser = async (req, res, next) => {
   try {
     const { username, password } = req.body;
     const result = await loginService(username, password);
-    console.log('User logged in:', result.UserResponse);
+    // console.log('User logged in:', result.UserResponse); // Đã ẩn đi để tránh rò rỉ token
     res.json({
       success: true,
       message: 'Login successful',
